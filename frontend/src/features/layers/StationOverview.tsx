@@ -16,21 +16,6 @@ import { classOf, guidelineAxisMax, guidelineClasses, valueRange } from './mapDa
 import { readingOf } from './stationReadings'
 import type { StationFeature } from './types'
 
-/** A strip-plot dot filled with its station's WHO class colour (stored on the point as `fill`). */
-function ClassDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { fill?: string } }) {
-  return (
-    <circle
-      cx={cx}
-      cy={cy}
-      r={5}
-      fill={payload?.fill}
-      fillOpacity={0.85}
-      stroke="var(--color-ink)"
-      strokeOpacity={0.6}
-    />
-  )
-}
-
 const AXIS_TICK = { fill: 'var(--color-muted)', fontSize: 11 }
 
 /**
@@ -70,10 +55,16 @@ export function StationOverview({
   const mid = median(values)
   const rank = inScale ? rankFromHighest(values, own.value) : null
   const classes = range === null ? null : guidelineClasses(property, range.unit)
+  // A point carries `fill` only when it has a class: an undefined `fill` on a point would
+  // override the Scatter's own fill and draw the dot black.
+  const fillFor = (value: number) => {
+    const colour = classOf(classes, value)?.colour
+    return colour === undefined ? {} : { fill: colour }
+  }
   const others = comparable
     .filter((c) => c.id !== station.id)
-    .map((c, i) => ({ ...c, lane: i % 3, fill: classOf(classes, c.value)?.colour }))
-  const ownClass = own === undefined ? undefined : classOf(classes, own.value)
+    .map((c, i) => ({ ...c, lane: i % 3, ...fillFor(c.value) }))
+  const ownClass = own === undefined || !inScale ? undefined : classOf(classes, own.value)
   const dataMax = niceMax(Math.max(...values, 0))
   const axisMax = classes === null ? dataMax : guidelineAxisMax(classes, dataMax)
 
@@ -185,7 +176,7 @@ export function StationOverview({
                   stroke={classes === null ? undefined : 'var(--color-ink)'}
                   strokeOpacity={0.6}
                   isAnimationActive={false}
-                  shape={classes === null ? 'circle' : ClassDot}
+                  shape="circle"
                 />
                 <Scatter
                   data={[{ name: station.properties.name, value: own.value, lane: 1 }]}

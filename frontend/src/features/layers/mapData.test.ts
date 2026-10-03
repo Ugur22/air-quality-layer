@@ -6,6 +6,7 @@ import {
   buildMapData,
   classOf,
   GUIDELINE_COLOURS,
+  guidelineAxisMax,
   guidelineClasses,
   pickColourProperty,
   stationCirclePaint,
@@ -331,5 +332,26 @@ describe('classOf', () => {
 
   it('has no class without a table', () => {
     expect(classOf(null, 10)).toBeUndefined()
+  })
+})
+
+describe('guidelineAxisMax', () => {
+  const classes = guidelineClasses('pm25', 'µg/m³') ?? []
+
+  it('reaches twice the guideline level when the data is lower', () => {
+    expect(guidelineAxisMax(classes, 8)).toBe(30)
+  })
+
+  it('keeps the data maximum when it is higher', () => {
+    expect(guidelineAxisMax(classes, 40)).toBe(40)
+  })
+})
+
+describe('guidelineClasses for no2', () => {
+  it('has four classes and keeps the darkest colour for the top one', () => {
+    const classes = guidelineClasses('no2', 'µg/m³')
+
+    expect(classes?.map((c) => c.label)).toEqual(['≤ 25', '25–50', '50–120', '> 120'])
+    expect(classes?.at(-1)?.colour).toBe(GUIDELINE_COLOURS.at(-1))
   })
 })

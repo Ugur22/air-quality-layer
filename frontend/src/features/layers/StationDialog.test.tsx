@@ -122,6 +122,39 @@ describe('StationDialog', () => {
     expect(panel).toHaveTextContent('> 75')
   })
 
+  it('shows no WHO class for a reading in another unit than the layer scale', () => {
+    const odd = structuredClone(second)
+    odd.properties.readings.pm25 = { value: 0.01, unit: 'ppm', observed_at: '2026-10-03T08:00:00Z' }
+    open(odd)
+
+    const panel = screen.getByRole('tabpanel')
+    expect(panel).toHaveTextContent(/not compared/i)
+    expect(panel).not.toHaveTextContent(/WHO 2021/)
+  })
+
+  it('keeps the teal look and no bands for a pollutant without a guideline table', () => {
+    const renamed = structuredClone(layer.stations.features)
+    for (const station of renamed) {
+      const { pm25, ...rest } = station.properties.readings
+      station.properties.readings = pm25 ? { ...rest, so2: pm25 } : rest
+    }
+    const [one, two] = renamed as [StationFeature, StationFeature]
+    renderWithClient(
+      <StationDialog
+        station={two}
+        stations={[one, two]}
+        layerId="job-1"
+        property="so2"
+        now={now}
+        onClose={vi.fn()}
+      />,
+    )
+
+    const panel = screen.getByRole('tabpanel')
+    expect(panel).not.toHaveTextContent(/WHO 2021/)
+    expect(panel.querySelector('[fill="undefined"]')).toBeNull()
+  })
+
   it('closes from the close button and from Escape', async () => {
     const user = userEvent.setup()
     const onClose = open()

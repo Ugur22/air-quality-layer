@@ -144,7 +144,7 @@ export function StationTrend({
               width={40}
               tickFormatter={(v: number) => formatValue(v)}
               domain={axisTop === undefined ? undefined : [0, axisTop]}
-              allowDataOverflow
+              allowDataOverflow={axisTop !== undefined}
             />
             {bands.map((c) => (
               <ReferenceArea
