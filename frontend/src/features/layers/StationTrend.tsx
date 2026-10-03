@@ -2,7 +2,9 @@ import {
   Area,
   AreaChart,
   CartesianGrid,
+  ReferenceArea,
   ReferenceDot,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -13,7 +15,10 @@ import { Button } from '@/components/ui/button'
 import { formatValue } from '@/lib/format'
 import { describeError } from '@/features/syncs/messages'
 import { ApiError } from '@/lib/api'
+import { niceMax } from '@/lib/stats'
 import { HISTORY_HOURS, useStationHistory } from './api'
+import { ClassChip, GuidelineKey } from './GuidelineKey'
+import { classOf, guidelineAxisMax, guidelineClasses } from './mapData'
 
 const TIME = new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit' })
 const DAY_TIME = new Intl.DateTimeFormat('en-GB', {
@@ -95,13 +100,18 @@ export function StationTrend({
   const low = Math.min(...values)
   const high = Math.max(...values)
   const unitText = unit ?? ''
+  const classes = guidelineClasses(property, unitText)
+  const latestClass = classOf(classes, latest.value)
+  const axisTop = classes === null ? undefined : guidelineAxisMax(classes, niceMax(high))
+  const bands =
+    classes === null || axisTop === undefined ? [] : classes.filter((c) => c.from < axisTop)
 
   return (
     <div className="flex flex-col gap-4">
       <div
         className="h-80 w-full"
         role="img"
-        aria-label={`${property} over the last ${String(HISTORY_HOURS)} hours: latest ${formatValue(latest.value)} ${unitText}, lowest ${formatValue(low)}, highest ${formatValue(high)}`}
+        aria-label={`${property} over the last ${String(HISTORY_HOURS)} hours: latest ${formatValue(latest.value)} ${unitText}${latestClass ? ` (WHO class ${latestClass.label})` : ''}, lowest ${formatValue(low)}, highest ${formatValue(high)}`}
       >
         <ResponsiveContainer
           width="100%"
@@ -133,7 +143,34 @@ export function StationTrend({
               axisLine={false}
               width={40}
               tickFormatter={(v: number) => formatValue(v)}
+              domain={axisTop === undefined ? undefined : [0, axisTop]}
+              allowDataOverflow
             />
+            {bands.map((c) => (
+              <ReferenceArea
+                key={c.label}
+                y1={c.from}
+                y2={Math.min(c.upTo, axisTop ?? c.upTo)}
+                fill={c.colour}
+                fillOpacity={0.25}
+                stroke="none"
+                ifOverflow="hidden"
+              />
+            ))}
+            {classes?.[0] ? (
+              <ReferenceLine
+                y={classes[0].upTo}
+                stroke="var(--color-ink)"
+                strokeOpacity={0.6}
+                strokeDasharray="4 3"
+                label={{
+                  value: `WHO guideline ${formatValue(classes[0].upTo)}`,
+                  position: 'insideBottomLeft',
+                  fill: 'var(--color-muted)',
+                  fontSize: 11,
+                }}
+              />
+            ) : null}
             <Tooltip
               cursor={{ stroke: 'var(--color-muted)', strokeDasharray: '3 3' }}
               formatter={(v) => [`${formatValue(Number(v))} ${unitText}`, property]}
@@ -148,10 +185,12 @@ export function StationTrend({
             <Area
               type="monotone"
               dataKey="value"
-              stroke="var(--color-accent)"
+              // With bands the line is neutral and unfilled: a teal line and fill over the bands
+              // would tint every class colour and make the line read as a class itself.
+              stroke={classes === null ? 'var(--color-accent)' : 'var(--color-ink)'}
               strokeWidth={2.5}
               fill="var(--color-accent)"
-              fillOpacity={0.14}
+              fillOpacity={classes === null ? 0.14 : 0}
               dot={false}
               activeDot={{ r: 4 }}
               isAnimationActive={false}
@@ -160,8 +199,8 @@ export function StationTrend({
               x={latest.t}
               y={latest.value}
               r={5}
-              fill="var(--color-accent)"
-              stroke="var(--color-surface)"
+              fill={latestClass?.colour ?? 'var(--color-accent)'}
+              stroke={latestClass ? 'var(--color-ink)' : 'var(--color-surface)'}
               strokeWidth={2}
             />
           </AreaChart>
@@ -183,13 +222,26 @@ export function StationTrend({
               {note ? (
                 <span className="block text-xs font-normal text-muted">at {note}</span>
               ) : null}
+              {label === 'Latest' && latestClass ? (
+                <span className="block">
+                  <ClassChip guideline={latestClass} unit={unitText} />
+                </span>
+              ) : null}
             </dd>
           </div>
         ))}
       </dl>
-      <p className="text-xs text-muted">
-        Hourly averages from OpenAQ, fetched when you open this tab and shown in your time zone.
-      </p>
+      {classes === null ? (
+        <p className="text-xs text-muted">
+          Hourly averages from OpenAQ, fetched when you open this tab and shown in your time zone.
+        </p>
+      ) : (
+        <GuidelineKey
+          classes={classes}
+          unit={unitText}
+          note="Points are hourly averages from OpenAQ, fetched when you open this tab and shown in your time zone. The bands are 24-hour levels, so one high hour does not mean the day exceeds them."
+        />
+      )}
     </div>
   )
 }

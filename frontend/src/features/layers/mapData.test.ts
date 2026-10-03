@@ -2,7 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { layer } from '@/test/fixtures'
 import { validateStyleMin } from '@maplibre/maplibre-gl-style-spec'
 import type { StationFeature } from './types'
-import { buildMapData, pickColourProperty, stationCirclePaint, valueRange } from './mapData'
+import {
+  buildMapData,
+  classOf,
+  GUIDELINE_COLOURS,
+  guidelineClasses,
+  pickColourProperty,
+  stationCirclePaint,
+  valueRange,
+} from './mapData'
 
 const now = new Date('2026-10-03T10:00:00Z')
 const stations = layer.stations.features
@@ -234,5 +242,94 @@ describe('stationCirclePaint', () => {
 
     expect(JSON.stringify(paint?.['circle-opacity'])).toContain('stale')
     expect(JSON.stringify(paint?.['circle-color'])).toContain('hasValue')
+  })
+})
+
+describe('guidelineClasses', () => {
+  it('has a class per band, the first being within the WHO guideline', () => {
+    const classes = guidelineClasses('pm25', 'µg/m³')
+
+    expect(classes?.map((c) => c.label)).toEqual(['≤ 15', '15–25', '25–50', '50–75', '> 75'])
+    expect(classes?.map((c) => c.colour)).toEqual([...GUIDELINE_COLOURS])
+  })
+
+  it('accepts the Greek mu spelling of the unit', () => {
+    expect(guidelineClasses('pm25', 'μg/m³')).not.toBeNull()
+  })
+
+  it.each([
+    ['a pollutant without a table', 'o3', 'µg/m³'],
+    ['a unit other than µg/m³', 'pm25', 'ppm'],
+  ])('is null for %s', (_label, property, unit) => {
+    expect(guidelineClasses(property, unit)).toBeNull()
+  })
+})
+
+describe('stationCirclePaint against guideline classes', () => {
+  const range = { min: 3, max: 90, unit: 'µg/m³', otherUnitCount: 0 }
+
+  function colourAt(value: number, property = 'pm25'): string {
+    const expr = stationCirclePaint(range, property)?.['circle-color'] as unknown[]
+    const classed = expr[2] as unknown[]
+    // ['case', ['<=', v, b0], c0, ['<=', v, b1], c1, ..., last]
+    for (let i = 1; i < classed.length - 1; i += 2) {
+      const [operator, , bound] = classed[i] as [string, unknown, number]
+      expect(operator).toBe('<=')
+      if (value <= bound) return classed[i + 1] as string
+    }
+    return classed[classed.length - 1] as string
+  }
+
+  it('is a valid MapLibre style', () => {
+    expect(
+      validateStyleMin({
+        version: 8,
+        sources: { s: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
+        layers: [
+          { id: 'l', type: 'circle', source: 's', paint: stationCirclePaint(range, 'pm25') },
+        ],
+      }),
+    ).toEqual([])
+  })
+
+  it('puts a value on a boundary in the lower class and one just above in the next', () => {
+    expect(colourAt(15)).toBe(GUIDELINE_COLOURS[0])
+    expect(colourAt(15.1)).toBe(GUIDELINE_COLOURS[1])
+    expect(colourAt(75)).toBe(GUIDELINE_COLOURS[3])
+    expect(colourAt(200)).toBe(GUIDELINE_COLOURS[4])
+  })
+
+  it('colours the same value the same way whatever the layer range', () => {
+    const narrow = stationCirclePaint({ ...range, min: 20, max: 21 }, 'pm25')
+    const wide = stationCirclePaint(range, 'pm25')
+
+    expect(narrow?.['circle-color']).toEqual(wide?.['circle-color'])
+  })
+
+  it('still rings stations without a value and fades stale ones', () => {
+    const paint = stationCirclePaint(range, 'pm25')
+
+    expect(JSON.stringify(paint?.['circle-color'])).toContain('hasValue')
+    expect(JSON.stringify(paint?.['circle-opacity'])).toContain('stale')
+  })
+
+  it('keeps the relative ramp for a pollutant without a table', () => {
+    const color = stationCirclePaint(range, 'o3')?.['circle-color'] as unknown[]
+
+    expect(JSON.stringify(color)).toContain('interpolate')
+  })
+})
+
+describe('classOf', () => {
+  const classes = guidelineClasses('pm25', 'µg/m³')
+
+  it('puts a value on a boundary in the lower class', () => {
+    expect(classOf(classes, 15)?.label).toBe('≤ 15')
+    expect(classOf(classes, 15.1)?.label).toBe('15–25')
+    expect(classOf(classes, 500)?.label).toBe('> 75')
+  })
+
+  it('has no class without a table', () => {
+    expect(classOf(null, 10)).toBeUndefined()
   })
 })

@@ -9,6 +9,7 @@ import { formatValue } from '@/lib/format'
 import {
   buildMapData,
   COLOUR_STOPS,
+  guidelineClasses,
   NO_VALUE_LABEL,
   STATION_LABEL_LAYOUT,
   STATION_LABEL_PAINT,
@@ -60,6 +61,7 @@ function Legend({
   range: ReturnType<typeof valueRange>
   showSyncedBox: boolean
 }) {
+  const classes = range === null ? null : guidelineClasses(property, range.unit)
   return (
     <div
       role="group"
@@ -68,6 +70,25 @@ function Legend({
     >
       {property === null || range === null ? (
         <p>{property === null ? 'Nothing to colour by.' : `No station reports ${property}.`}</p>
+      ) : classes !== null ? (
+        <div className="flex flex-col gap-1">
+          <p>
+            Latest <span className="font-mono text-ink">{property}</span> reading ({range.unit})
+            against WHO 2021 24-hour guideline levels
+          </p>
+          <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {classes.map((c) => (
+              <span key={c.label} className="flex items-center gap-1.5">
+                <span
+                  aria-hidden
+                  className="size-3 rounded-full border border-ink/70"
+                  style={{ background: c.colour }}
+                />
+                <span className="tabular-nums">{c.label}</span>
+              </span>
+            ))}
+          </div>
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="font-mono text-ink">{property}</span>
@@ -85,15 +106,17 @@ function Legend({
       )}
       {property !== null ? (
         <div className="flex flex-col gap-1">
-          <p className="flex items-center gap-2">
-            <span
-              aria-hidden
-              className="inline-grid h-5 min-w-9 place-items-center rounded-md bg-accent px-1.5 font-mono text-[11px] text-white"
-            >
-              12.4
-            </span>
-            Latest {property} reading
-          </p>
+          {classes === null ? (
+            <p className="flex items-center gap-2">
+              <span
+                aria-hidden
+                className="inline-grid h-5 min-w-9 place-items-center rounded-md bg-accent px-1.5 font-mono text-[11px] text-white"
+              >
+                12.4
+              </span>
+              Latest {property} reading
+            </p>
+          ) : null}
           <p className="flex items-center gap-2">
             <span
               aria-hidden
@@ -187,7 +210,7 @@ export function StationMap({
     [visible, stations, property, now],
   )
   const range = useMemo(() => valueRange(stations, property), [stations, property])
-  const paint = useMemo(() => stationCirclePaint(range), [range])
+  const paint = useMemo(() => stationCirclePaint(range, property), [range, property])
   const region = useMemo(() => (draftBbox ? outline(draftBbox) : EMPTY), [draftBbox])
   // After a sync the form can be edited away from the region the stations belong to; both are drawn.
   const showSyncedBox = layerBbox !== null && !sameBox(layerBbox, draftBbox)

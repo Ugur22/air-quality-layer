@@ -24,6 +24,16 @@ beforeEach(() => {
   vi.setSystemTime(now)
 })
 
+/** A copy of the layer whose pm25 readings are another pollutant, which has no guideline table. */
+function withoutGuideline(source: typeof layer) {
+  const copy = structuredClone(source)
+  for (const station of copy.stations.features) {
+    const { pm25, ...rest } = station.properties.readings
+    station.properties.readings = pm25 ? { ...rest, so2: pm25 } : rest
+  }
+  return copy
+}
+
 describe('StationMap', () => {
   it('hands the chosen property of every station to the map source', () => {
     render(
@@ -244,7 +254,7 @@ describe('StationMap', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('o3 not reported')
   })
 
-  it('explains the colours: the range with its unit, faded means stale, hollow means no value', () => {
+  it('explains the colours: WHO classes with the unit, faded means stale, hollow means no value', () => {
     render(
       <StationMap
         layer={layer}
@@ -258,11 +268,32 @@ describe('StationMap', () => {
 
     const legend = screen.getByRole('group', { name: /legend/i })
     expect(legend).toHaveTextContent('pm25')
-    expect(legend).toHaveTextContent('7.6')
-    expect(legend).toHaveTextContent('36.4')
+    expect(legend).toHaveTextContent(/WHO 2021/)
+    expect(legend).toHaveTextContent('≤ 15')
+    expect(legend).toHaveTextContent('> 75')
     expect(legend).toHaveTextContent('µg/m³')
+    expect(legend).not.toHaveTextContent(/relative to this layer/i)
     expect(legend).toHaveTextContent(/faded/i)
     expect(legend).toHaveTextContent(/hollow/i)
+  })
+
+  it('keeps the relative range for a pollutant without a guideline table', () => {
+    render(
+      <StationMap
+        layer={withoutGuideline(layer)}
+        property="so2"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const legend = screen.getByRole('group', { name: /legend/i })
+    expect(legend).toHaveTextContent(/relative to this layer/i)
+    expect(legend).toHaveTextContent('7.6')
+    expect(legend).toHaveTextContent('36.4')
+    expect(legend).not.toHaveTextContent(/WHO/)
   })
 
   it('shows a legend note instead of a range when no station has the property', () => {
@@ -283,10 +314,10 @@ describe('StationMap', () => {
   })
 
   it('rounds float noise in the legend range', () => {
-    const noisy = structuredClone(layer)
+    const noisy = withoutGuideline(layer)
     const second = noisy.stations.features[1]
     if (second)
-      second.properties.readings.pm25 = {
+      second.properties.readings.so2 = {
         value: 36.44749984741211,
         unit: 'µg/m³',
         observed_at: '2026-10-03T08:00:00Z',
@@ -295,7 +326,7 @@ describe('StationMap', () => {
     render(
       <StationMap
         layer={noisy}
-        property="pm25"
+        property="so2"
         selectedId={null}
         onSelect={vi.fn()}
         now={now}
@@ -539,9 +570,9 @@ describe('StationMap', () => {
   it('shows only the visible stations but keeps the colour scale of the whole layer', () => {
     render(
       <StationMap
-        layer={layer}
+        layer={withoutGuideline(layer)}
         visibleIds={new Set(['f-1'])}
-        property="pm25"
+        property="so2"
         selectedId={null}
         onSelect={vi.fn()}
         now={now}

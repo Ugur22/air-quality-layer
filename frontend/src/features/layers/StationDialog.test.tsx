@@ -95,9 +95,31 @@ describe('StationDialog', () => {
 
     expect(
       await screen.findByRole('img', {
-        name: 'pm25 over the last 24 hours: latest 10.9 µg/m³, lowest 4.5, highest 31',
+        name: 'pm25 over the last 24 hours: latest 10.9 µg/m³ (WHO class ≤ 15), lowest 4.5, highest 31',
       }),
     ).toBeInTheDocument()
+  })
+
+  it('names the WHO class of the latest trend value and explains the bands', async () => {
+    mockApi({ [HISTORY_ROUTE]: () => jsonResponse(200, { history: history() }) })
+    const user = userEvent.setup()
+    open()
+
+    await user.click(screen.getByRole('tab', { name: 'Trend' }))
+
+    const panel = await screen.findByRole('tabpanel')
+    await within(panel).findByRole('img')
+    expect(panel).toHaveTextContent(/WHO 2021 24-hour guideline levels/)
+    expect(panel).toHaveTextContent('≤ 15 µg/m³')
+    expect(panel).toHaveTextContent(/one high hour does not mean the day exceeds/i)
+  })
+
+  it('shows the WHO class next to the overview value and explains the bands', () => {
+    open(second)
+
+    const panel = screen.getByRole('tabpanel')
+    expect(panel).toHaveTextContent(/WHO 2021 24-hour guideline levels/)
+    expect(panel).toHaveTextContent('> 75')
   })
 
   it('closes from the close button and from Escape', async () => {

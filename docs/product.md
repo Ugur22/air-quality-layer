@@ -23,7 +23,7 @@ Roles, not personas; no real users exist yet.
 ## Non-goals (Decided for the first slice)
 
 - No alerts, notifications, or thresholds that trigger anything.
-- No AQI index computation; the first slice shows a station's raw parameter values and units. Which AQI formula (if any) to adopt later is **Open**.
+- No AQI index computation; the first slice shows a station's raw parameter values and units. Which AQI formula (if any) to adopt later is **Open**. One exception (ADR 0015): a marker's colour is its class against WHO 2021 24-hour guideline levels (pm25, pm10, no2), not an index; other pollutants keep a layer-relative ramp.
 - No stored history, no scheduled collection, and no time-series analysis. One exception (ADR 0014): clicking a station can show a recent window (the last 24 hours in the UI) of one pollutant, fetched from OpenAQ at that moment and not stored.
 - No scheduled or recurring sync. Sync is triggered by a user action only. Backlog (not planned): revisit only once a pull-based refresh cadence is actually wanted, which also requires deciding what a re-sync does to existing station readings (see `domain.md`).
 - No real-time collaboration, no offline mode.

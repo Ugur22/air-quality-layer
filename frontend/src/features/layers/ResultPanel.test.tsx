@@ -194,7 +194,7 @@ describe('ResultPanel filter', () => {
     expect(mapStations().map((s) => s.name)).toEqual(['Amsterdam-Van Diemenstraat'])
   })
 
-  it('keeps the colour scale of the whole layer while filtering', async () => {
+  it('keeps the same guideline legend while filtering', async () => {
     mockApi({ [LAYER_ROUTE]: layerServer(layer) })
     const user = userEvent.setup({ delay: null })
     panel()
@@ -203,8 +203,8 @@ describe('ResultPanel filter', () => {
     await screen.findByText('Showing 1 of 2 stations.')
 
     const legend = screen.getByRole('group', { name: /legend/i })
-    expect(legend).toHaveTextContent('7.6')
-    expect(legend).toHaveTextContent('36.4')
+    expect(legend).toHaveTextContent('≤ 15')
+    expect(legend).toHaveTextContent('> 75')
   })
 
   it('sends nothing and explains an invalid number', async () => {

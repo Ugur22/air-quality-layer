@@ -1,4 +1,5 @@
 import {
+  ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
   Scatter,
@@ -10,9 +11,25 @@ import {
 import { formatValue } from '@/lib/format'
 import { formatAge, isStale } from '@/lib/freshness'
 import { median, niceMax, ordinal, rankFromHighest } from '@/lib/stats'
-import { valueRange } from './mapData'
+import { ClassChip, GuidelineKey, Swatch } from './GuidelineKey'
+import { classOf, guidelineAxisMax, guidelineClasses, valueRange } from './mapData'
 import { readingOf } from './stationReadings'
 import type { StationFeature } from './types'
+
+/** A strip-plot dot filled with its station's WHO class colour (stored on the point as `fill`). */
+function ClassDot({ cx, cy, payload }: { cx?: number; cy?: number; payload?: { fill?: string } }) {
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={5}
+      fill={payload?.fill}
+      fillOpacity={0.85}
+      stroke="var(--color-ink)"
+      strokeOpacity={0.6}
+    />
+  )
+}
 
 const AXIS_TICK = { fill: 'var(--color-muted)', fontSize: 11 }
 
@@ -52,7 +69,13 @@ export function StationOverview({
   const values = comparable.map((c) => c.value)
   const mid = median(values)
   const rank = inScale ? rankFromHighest(values, own.value) : null
-  const axisMax = niceMax(Math.max(...values, 0))
+  const classes = range === null ? null : guidelineClasses(property, range.unit)
+  const others = comparable
+    .filter((c) => c.id !== station.id)
+    .map((c, i) => ({ ...c, lane: i % 3, fill: classOf(classes, c.value)?.colour }))
+  const ownClass = own === undefined ? undefined : classOf(classes, own.value)
+  const dataMax = niceMax(Math.max(...values, 0))
+  const axisMax = classes === null ? dataMax : guidelineAxisMax(classes, dataMax)
 
   return (
     <div className="flex flex-col gap-6">
@@ -63,6 +86,12 @@ export function StationOverview({
           </span>
           <span className="pb-1 text-sm text-muted">
             {own.unit} <span className="font-mono">{property}</span>
+            {ownClass ? (
+              <span className="mt-0.5 block">
+                <ClassChip guideline={ownClass} unit="" />
+                <span className="sr-only"> WHO 2021 24-hour guideline class</span>
+              </span>
+            ) : null}
           </span>
           <span className="ml-auto pb-1 text-right text-sm text-muted">
             {rank !== null ? (
@@ -90,7 +119,7 @@ export function StationOverview({
             Where this station sits · {property} across the region
           </h3>
           <p className="sr-only">
-            {`${property} here is ${formatValue(own.value)} ${own.unit}, ${ordinal(rank ?? 1)} highest of ${String(values.length)}. The median is ${formatValue(mid)}.`}
+            {`${property} here is ${formatValue(own.value)} ${own.unit}, ${ordinal(rank ?? 1)} highest of ${String(values.length)}. The median is ${formatValue(mid)}.${ownClass ? ` WHO 2021 guideline class ${ownClass.label} ${own.unit}.` : ''}`}
           </p>
           <div className="h-40 w-full" aria-hidden>
             <ResponsiveContainer
@@ -113,6 +142,19 @@ export function StationOverview({
                   axisLine={{ stroke: 'var(--color-line)' }}
                 />
                 <YAxis type="number" dataKey="lane" domain={[-0.6, 2.6]} hide />
+                {classes
+                  ?.filter((c) => c.from < axisMax)
+                  .map((c) => (
+                    <ReferenceArea
+                      key={c.label}
+                      x1={c.from}
+                      x2={Math.min(c.upTo, axisMax)}
+                      fill={c.colour}
+                      fillOpacity={0.25}
+                      stroke="none"
+                      ifOverflow="hidden"
+                    />
+                  ))}
                 <ReferenceLine
                   x={mid}
                   stroke="var(--color-muted)"
@@ -137,16 +179,17 @@ export function StationOverview({
                   }}
                 />
                 <Scatter
-                  data={comparable
-                    .filter((c) => c.id !== station.id)
-                    .map((c, i) => ({ ...c, lane: i % 3 }))}
+                  data={others}
                   fill="var(--color-accent)"
-                  fillOpacity={0.45}
+                  fillOpacity={classes === null ? 0.45 : 0.85}
+                  stroke={classes === null ? undefined : 'var(--color-ink)'}
+                  strokeOpacity={0.6}
                   isAnimationActive={false}
+                  shape={classes === null ? 'circle' : ClassDot}
                 />
                 <Scatter
                   data={[{ name: station.properties.name, value: own.value, lane: 1 }]}
-                  fill="var(--color-accent)"
+                  fill={ownClass?.colour ?? 'var(--color-accent)'}
                   stroke="var(--color-ink)"
                   strokeWidth={2.5}
                   shape="circle"
@@ -155,6 +198,13 @@ export function StationOverview({
               </ScatterChart>
             </ResponsiveContainer>
           </div>
+          {classes !== null ? (
+            <GuidelineKey
+              classes={classes}
+              unit={own.unit}
+              note="Each dot is a station's latest reading. The bands are 24-hour levels, so one high hourly reading does not mean the day exceeds them."
+            />
+          ) : null}
         </section>
       ) : null}
 
@@ -174,7 +224,13 @@ export function StationOverview({
                 }),
                 0,
               )
-              const share = peak > 0 ? Math.max(0, Math.min(1, reading.value / peak)) : 0
+              const rowClasses = guidelineClasses(name, reading.unit)
+              const rowClass = classOf(rowClasses, reading.value)
+              // With a guideline the bar is absolute (full means above the top class); without
+              // one it can only be relative to the other stations.
+              const topBound = rowClasses?.[rowClasses.length - 2]?.upTo
+              const scaleTo = topBound ?? peak
+              const share = scaleTo > 0 ? Math.max(0, Math.min(1, reading.value / scaleTo)) : 0
               const current = name === property
               return (
                 <li
@@ -188,7 +244,10 @@ export function StationOverview({
                   <span aria-hidden className="h-2 overflow-hidden rounded-full bg-line">
                     <span
                       className="block h-full rounded-full bg-accent"
-                      style={{ width: `${String(share * 100)}%` }}
+                      style={{
+                        width: `${String(share * 100)}%`,
+                        ...(rowClass ? { background: rowClass.colour } : {}),
+                      }}
                     />
                   </span>
                   <span className="text-right tabular-nums">
@@ -196,6 +255,12 @@ export function StationOverview({
                     <span className="text-xs text-muted">
                       {reading.unit} · {formatAge(reading.observed_at, now)}
                     </span>
+                    {rowClass ? (
+                      <span className="ml-1.5 inline-flex items-center gap-1 align-middle text-xs text-muted">
+                        <Swatch colour={rowClass.colour} />
+                        {rowClass.label}
+                      </span>
+                    ) : null}
                     {isStale(reading.observed_at, now) ? (
                       <span className="ml-1.5 rounded-full border border-warn/50 px-1.5 font-mono text-xs text-warn">
                         stale

@@ -99,17 +99,97 @@ export function valueRange(stations: StationFeature[], property: string | null):
 /** Low to high on one hue. The scale is relative to this layer; it is not an air-quality index. */
 export const COLOUR_STOPS = ['#cfe8e4', '#2f9c93', '#07403d'] as const
 
+/** ColorBrewer YlOrRd, 5 classes: hue escalates, so the top class cannot read as benign. */
+export const GUIDELINE_COLOURS = ['#ffffb2', '#fecc5c', '#fd8d3c', '#f03b20', '#bd0026'] as const
+
+/**
+ * Upper bounds (inclusive) of each class below the last, in µg/m³: the WHO 2021 24-hour guideline
+ * level, then interim targets. To fit five colours one target is left out (pm25: 37.5, pm10: 50),
+ * so a class position is not the same interim target across pollutants (ADR 0015). The stored value
+ * is the latest hourly reading, so a class describes that reading, not a 24-hour mean.
+ */
+const GUIDELINE_BREAKS: Record<string, readonly number[]> = {
+  pm25: [15, 25, 50, 75],
+  pm10: [45, 75, 100, 150],
+  no2: [25, 50, 120],
+}
+
+export interface GuidelineClass {
+  colour: string
+  label: string
+  /** Exclusive lower bound of the class; 0 for the first. */
+  from: number
+  /** Inclusive upper bound of the class; Infinity for the last. */
+  upTo: number
+}
+
+/** OpenAQ spells the unit with either the micro sign or the Greek mu. */
+const isMicrogramsPerCubicMetre = (unit: string) => unit.replace('μ', 'µ') === 'µg/m³'
+
+/** Fewer classes than colours skip the second-to-last step, so the top class stays the darkest. */
+function coloursFor(count: number): string[] {
+  const [darkest] = GUIDELINE_COLOURS.slice(-1)
+  return count >= GUIDELINE_COLOURS.length
+    ? [...GUIDELINE_COLOURS]
+    : [...GUIDELINE_COLOURS.slice(0, count - 1), darkest ?? NO_FILL]
+}
+
+/** The classes for a pollutant, or null when there is no table or the unit is not µg/m³. */
+export function guidelineClasses(property: string | null, unit: string): GuidelineClass[] | null {
+  const breaks = property === null ? undefined : GUIDELINE_BREAKS[property]
+  if (breaks === undefined || !isMicrogramsPerCubicMetre(unit)) return null
+  const colours = coloursFor(breaks.length + 1)
+  return [...breaks, Infinity].map((upTo, i) => {
+    const lower = breaks[i - 1]
+    const label =
+      lower === undefined
+        ? `≤ ${formatValue(upTo)}`
+        : upTo === Infinity
+          ? `> ${formatValue(lower)}`
+          : `${formatValue(lower)}–${formatValue(upTo)}`
+    return { colour: colours[i] ?? '', label, from: lower ?? 0, upTo }
+  })
+}
+
+/** The class a value falls in; a value on a boundary belongs to the lower class, as on the map. */
+export function classOf(
+  classes: GuidelineClass[] | null,
+  value: number,
+): GuidelineClass | undefined {
+  return classes?.find((c) => value <= c.upTo)
+}
+
+/** Room for the guideline level and the class above it, so the first bands are always visible. */
+export function guidelineAxisMax(classes: GuidelineClass[], dataMax: number): number {
+  return Math.max(dataMax, (classes[0]?.upTo ?? 0) * 2)
+}
+
 const NO_FILL = 'rgba(0, 0, 0, 0)'
 
-export function stationCirclePaint(range: ValueRange | null): CircleLayerSpecification['paint'] {
+function guidelineFill(property: string, unit: string) {
+  const classes = guidelineClasses(property, unit)
+  if (classes === null) return null
+  const last = classes[classes.length - 1]
+  // `case` with `<=` keeps a value exactly on a boundary in the lower class; `step` would not.
+  const branches = classes.slice(0, -1).flatMap((c) => [['<=', ['get', 'value'], c.upTo], c.colour])
+  return ['case', ...branches, last?.colour ?? NO_FILL]
+}
+
+export function stationCirclePaint(
+  range: ValueRange | null,
+  property: string | null = null,
+): CircleLayerSpecification['paint'] {
   const [low, mid, high] = COLOUR_STOPS
   // Interpolation stops must strictly ascend. A range one float step wide would make the middle
   // stop equal to an end and invalidate the whole layer, so it counts as a single value.
   const middle = range === null ? 0 : (range.min + range.max) / 2
   const hasSpread = range !== null && range.min < middle && middle < range.max
-  const fill = hasSpread
-    ? ['interpolate', ['linear'], ['get', 'value'], range.min, low, middle, mid, range.max, high]
-    : mid
+  const classed = range === null || property === null ? null : guidelineFill(property, range.unit)
+  const fill =
+    classed ??
+    (hasSpread
+      ? ['interpolate', ['linear'], ['get', 'value'], range.min, low, middle, mid, range.max, high]
+      : mid)
   return {
     'circle-radius': 9,
     // No value for this property: an empty ring, so the station is still visible.
