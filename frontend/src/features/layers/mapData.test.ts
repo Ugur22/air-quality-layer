@@ -9,7 +9,13 @@ import {
   guidelineAxisMax,
   guidelineClasses,
   pickColourProperty,
-  stationCirclePaint,
+  STATION_BORDER_PAINT,
+  stationBadgePaint,
+  stationFill,
+  STATION_BADGE_LAYOUT,
+  STATION_DOT_LAYOUT,
+  STATION_EMPTY_PAINT,
+  stationDotPaint,
   valueRange,
 } from './mapData'
 
@@ -102,10 +108,10 @@ describe('buildMapData labels', () => {
     expect(buildMapData(noisy, 'pm25', now).features[0]?.properties.label).toBe('36.45')
   })
 
-  it('labels a station without a usable value with an en dash', () => {
+  it('gives a station without a usable value no label, because it has no badge', () => {
     const data = buildMapData(stations, 'no2', now)
 
-    expect(data.features[1]?.properties.label).toBe('–')
+    expect(data.features[1]?.properties.label).toBe('')
   })
 })
 
@@ -180,7 +186,7 @@ describe('a parameter reported in different units', () => {
     expect(valueRange(mixed, 'o3')).toEqual({ min: 10, max: 20, unit: 'µg/m³', otherUnitCount: 1 })
   })
 
-  it('draws a station in another unit as a hollow ring instead of on the wrong scale', () => {
+  it('draws a station in another unit without a value instead of on the wrong scale', () => {
     const data = buildMapData(mixed, 'o3', now)
 
     expect(data.features.map((f) => f.properties.hasValue)).toEqual([true, true, false])
@@ -200,13 +206,30 @@ describe('a parameter reported in different units', () => {
   })
 })
 
-describe('stationCirclePaint', () => {
+describe('stationBadgePaint', () => {
   // The style validator is MapLibre's own, so an invalid expression fails here without a browser.
-  function problems(range: ReturnType<typeof valueRange>) {
+  function problems(range: ReturnType<typeof valueRange>, property: string | null = null) {
     return validateStyleMin({
       version: 8,
       sources: { s: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
-      layers: [{ id: 'stations', type: 'circle', source: 's', paint: stationCirclePaint(range) }],
+      layers: [
+        {
+          id: 'stations',
+          type: 'symbol',
+          source: 's',
+          layout: STATION_BADGE_LAYOUT,
+          paint: stationBadgePaint(range, property),
+        },
+        { id: 'border', type: 'symbol', source: 's', paint: STATION_BORDER_PAINT },
+        { id: 'empty', type: 'circle', source: 's', paint: STATION_EMPTY_PAINT },
+        {
+          id: 'dot',
+          type: 'circle',
+          source: 's',
+          layout: STATION_DOT_LAYOUT,
+          paint: stationDotPaint(range, property),
+        },
+      ],
     })
   }
   const base = { unit: 'µg/m³', otherUnitCount: 0 }
@@ -219,11 +242,11 @@ describe('stationCirclePaint', () => {
     ['negative values', { min: -3, max: 2, ...base }],
   ])('is a valid MapLibre style for %s', (_label, range) => {
     expect(problems(range)).toEqual([])
+    expect(problems(range, 'pm25')).toEqual([])
   })
 
   it('interpolates between ascending stops when values differ', () => {
-    const color = stationCirclePaint({ min: 0, max: 10, ...base })?.['circle-color'] as unknown[]
-    const interpolate = color[2] as unknown[]
+    const interpolate = stationFill({ min: 0, max: 10, ...base }) as unknown[]
 
     expect(interpolate[0]).toBe('interpolate')
     expect([interpolate[3], interpolate[5], interpolate[7]]).toEqual([0, 5, 10])
@@ -233,16 +256,23 @@ describe('stationCirclePaint', () => {
     ['min equals max', { min: 5, max: 5, ...base }],
     ['a range one float step wide', { min: 1, max: 1 + Number.EPSILON, ...base }],
   ])('falls back to one colour for %s instead of an invalid scale', (_label, range) => {
-    const color = stationCirclePaint(range)?.['circle-color'] as unknown[]
-
-    expect(JSON.stringify(color)).not.toContain('interpolate')
+    expect(JSON.stringify(stationFill(range))).not.toContain('interpolate')
   })
 
-  it('fades stale readings and rings stations without a value', () => {
-    const paint = stationCirclePaint({ min: 0, max: 10, ...base })
+  it('tints a stale reading paler, opaquely, so text on it stays legible', () => {
+    const paint = stationBadgePaint({ min: 0, max: 10, ...base })
 
-    expect(JSON.stringify(paint?.['circle-opacity'])).toContain('stale')
-    expect(JSON.stringify(paint?.['circle-color'])).toContain('hasValue')
+    expect(paint?.['icon-opacity']).toBeUndefined()
+    expect(JSON.stringify(paint?.['icon-color'])).toContain('stale')
+  })
+
+  it('writes white on the darkest class and dark ink on the others', () => {
+    const range = { min: 3, max: 90, ...base }
+    const text = stationBadgePaint(range, 'pm25')?.['text-color'] as unknown[]
+    const fresh = text[3] as unknown[]
+
+    // ['case', stale, ink, ['case', ['>', value, 75], white, ink]]
+    expect(fresh).toEqual(['case', ['>', ['get', 'value'], 75], '#ffffff', '#12201f'])
   })
 })
 
@@ -266,12 +296,11 @@ describe('guidelineClasses', () => {
   })
 })
 
-describe('stationCirclePaint against guideline classes', () => {
+describe('stationFill against guideline classes', () => {
   const range = { min: 3, max: 90, unit: 'µg/m³', otherUnitCount: 0 }
 
   function colourAt(value: number, property = 'pm25'): string {
-    const expr = stationCirclePaint(range, property)?.['circle-color'] as unknown[]
-    const classed = expr[2] as unknown[]
+    const classed = stationFill(range, property) as unknown[]
     // ['case', ['<=', v, b0], c0, ['<=', v, b1], c1, ..., last]
     for (let i = 1; i < classed.length - 1; i += 2) {
       const [operator, , bound] = classed[i] as [string, unknown, number]
@@ -281,18 +310,6 @@ describe('stationCirclePaint against guideline classes', () => {
     return classed[classed.length - 1] as string
   }
 
-  it('is a valid MapLibre style', () => {
-    expect(
-      validateStyleMin({
-        version: 8,
-        sources: { s: { type: 'geojson', data: { type: 'FeatureCollection', features: [] } } },
-        layers: [
-          { id: 'l', type: 'circle', source: 's', paint: stationCirclePaint(range, 'pm25') },
-        ],
-      }),
-    ).toEqual([])
-  })
-
   it('puts a value on a boundary in the lower class and one just above in the next', () => {
     expect(colourAt(15)).toBe(GUIDELINE_COLOURS[0])
     expect(colourAt(15.1)).toBe(GUIDELINE_COLOURS[1])
@@ -301,23 +318,13 @@ describe('stationCirclePaint against guideline classes', () => {
   })
 
   it('colours the same value the same way whatever the layer range', () => {
-    const narrow = stationCirclePaint({ ...range, min: 20, max: 21 }, 'pm25')
-    const wide = stationCirclePaint(range, 'pm25')
+    const narrow = stationFill({ ...range, min: 20, max: 21 }, 'pm25')
 
-    expect(narrow?.['circle-color']).toEqual(wide?.['circle-color'])
-  })
-
-  it('still rings stations without a value and fades stale ones', () => {
-    const paint = stationCirclePaint(range, 'pm25')
-
-    expect(JSON.stringify(paint?.['circle-color'])).toContain('hasValue')
-    expect(JSON.stringify(paint?.['circle-opacity'])).toContain('stale')
+    expect(narrow).toEqual(stationFill(range, 'pm25'))
   })
 
   it('keeps the relative ramp for a pollutant without a table', () => {
-    const color = stationCirclePaint(range, 'o3')?.['circle-color'] as unknown[]
-
-    expect(JSON.stringify(color)).toContain('interpolate')
+    expect(JSON.stringify(stationFill(range, 'o3'))).toContain('interpolate')
   })
 })
 

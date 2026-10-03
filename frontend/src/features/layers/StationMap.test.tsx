@@ -19,6 +19,8 @@ function stationsSource(): { features: { properties: Record<string, unknown> }[]
 
 beforeEach(() => {
   mapSpies.fitBounds.mockClear()
+  mapSpies.addImage.mockClear()
+  mapSpies.holdLoad = false
   vi.mocked(startRectangleDrawing).mockReset()
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(now)
@@ -63,10 +65,106 @@ describe('StationMap', () => {
     )
 
     const layout = JSON.parse(
-      screen.getByTestId('layer-station-values').getAttribute('data-layout') ?? '{}',
+      screen.getByTestId('layer-stations').getAttribute('data-layout') ?? '{}',
     ) as Record<string, unknown>
     expect(layout['text-field']).toEqual(['get', 'label'])
     expect(stationsSource().features.map((f) => f.properties.label)).toEqual(['7.6', '36.4'])
+  })
+
+  it('registers the badge image before drawing the layers that name it', () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId="f-1"
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    expect(mapSpies.addImage).toHaveBeenCalledWith(
+      'station-badge',
+      expect.anything(),
+      expect.objectContaining({ sdf: true }),
+    )
+    for (const id of ['stations', 'stations-border', 'stations-selected', 'stations-empty']) {
+      expect(screen.getByTestId(`layer-${id}`)).toBeInTheDocument()
+    }
+  })
+
+  it('draws no badge layer until the map has loaded and the image is registered', () => {
+    mapSpies.holdLoad = true
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    expect(screen.queryByTestId('layer-stations')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('layer-stations-border')).not.toBeInTheDocument()
+    expect(mapSpies.addImage).not.toHaveBeenCalled()
+  })
+
+  it('lets a click or hover reach both the badges and the dots of stations without a value', () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    expect(screen.getByTestId('map').getAttribute('data-interactive')).toBe(
+      'stations stations-dot stations-empty',
+    )
+  })
+
+  it('hands over from plain dots to value badges at one zoom, so the two never overlap', () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const zoom = (id: string, edge: 'minzoom' | 'maxzoom') =>
+      screen.getByTestId(`layer-${id}`).getAttribute(`data-${edge}`)
+    expect(zoom('stations-dot', 'maxzoom')).toBe(zoom('stations', 'minzoom'))
+    expect(zoom('stations-border', 'minzoom')).toBe(zoom('stations', 'minzoom'))
+    expect(zoom('stations-selected', 'minzoom')).toBe(zoom('stations', 'minzoom'))
+    expect(zoom('stations', 'minzoom')).not.toBeNull()
+  })
+
+  it('rings the selected station whether it is a badge or a dot', () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId="f-2"
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const filterOf = (id: string) =>
+      JSON.stringify(screen.getByTestId(`layer-${id}`).getAttribute('data-filter'))
+    expect(screen.getByTestId('layer-stations-selected')).toBeInTheDocument()
+    expect(screen.getByTestId('layer-stations-empty-selected')).toBeInTheDocument()
+    expect(filterOf('stations-empty-selected')).toContain('f-2')
   })
 
   it('explains the marker and the stations without a reading in the legend', () => {
@@ -83,7 +181,7 @@ describe('StationMap', () => {
 
     const legend = screen.getByRole('group', { name: /legend/i })
     expect(legend).toHaveTextContent(/latest pm25 reading/i)
-    expect(legend).toHaveTextContent(/–.*no usable pm25 value/i)
+    expect(legend).toHaveTextContent(/no usable pm25 value/i)
   })
 
   it('draws the outline of the box in the form', () => {
@@ -254,7 +352,7 @@ describe('StationMap', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('o3 not reported')
   })
 
-  it('explains the colours: WHO classes with the unit, faded means stale, hollow means no value', () => {
+  it('explains the colours: WHO classes with the unit, pale means stale, grey dot means no value', () => {
     render(
       <StationMap
         layer={layer}
@@ -273,8 +371,8 @@ describe('StationMap', () => {
     expect(legend).toHaveTextContent('> 75')
     expect(legend).toHaveTextContent('µg/m³')
     expect(legend).not.toHaveTextContent(/relative to this layer/i)
-    expect(legend).toHaveTextContent(/faded/i)
-    expect(legend).toHaveTextContent(/hollow/i)
+    expect(legend).toHaveTextContent(/pale badge/i)
+    expect(legend).toHaveTextContent(/grey dot/i)
   })
 
   it('keeps the relative range for a pollutant without a guideline table', () => {

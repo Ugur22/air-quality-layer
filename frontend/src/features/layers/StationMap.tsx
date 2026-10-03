@@ -10,12 +10,22 @@ import {
   buildMapData,
   COLOUR_STOPS,
   guidelineClasses,
-  NO_VALUE_LABEL,
-  STATION_LABEL_LAYOUT,
-  STATION_LABEL_PAINT,
-  stationCirclePaint,
+  BADGE_MIN_ZOOM,
+  HAS_VALUE_FILTER,
+  NO_VALUE_FILTER,
+  STATION_BADGE_LAYOUT,
+  STATION_BORDER_LAYOUT,
+  STATION_BORDER_PAINT,
+  STATION_DOT_LAYOUT,
+  STATION_EMPTY_PAINT,
+  STATION_EMPTY_SELECTED_PAINT,
+  STATION_SELECTED_LAYOUT,
+  STATION_SELECTED_PAINT,
+  stationBadgePaint,
+  stationDotPaint,
   valueRange,
 } from './mapData'
+import { addBadgeImage } from './badgeImage'
 import { startRectangleDrawing } from './regionDrawing'
 import { StationTooltip } from './StationTooltip'
 import type { MapLayerResponse } from './types'
@@ -110,7 +120,7 @@ function Legend({
             <p className="flex items-center gap-2">
               <span
                 aria-hidden
-                className="inline-grid h-5 min-w-9 place-items-center rounded-md bg-accent px-1.5 font-mono text-[11px] text-white"
+                className="inline-grid h-5 min-w-9 place-items-center rounded-full bg-accent px-2 font-mono text-[11px] text-white"
               >
                 12.4
               </span>
@@ -120,10 +130,8 @@ function Legend({
           <p className="flex items-center gap-2">
             <span
               aria-hidden
-              className="inline-grid h-5 min-w-9 place-items-center rounded-md border border-dashed border-muted bg-surface px-1.5 font-mono text-[11px]"
-            >
-              {NO_VALUE_LABEL}
-            </span>
+              className="mx-3.5 size-2.5 rounded-full border border-muted bg-line"
+            />
             <span>No usable {property} value</span>
           </p>
         </div>
@@ -138,11 +146,12 @@ function Legend({
               {range.otherUnitCount === 1
                 ? `1 station reports ${String(property)} in another unit and is`
                 : `${String(range.otherUnitCount)} stations report ${String(property)} in another unit and are`}{' '}
-              left off this scale and drawn as a hollow ring; the popup shows the real value.
+              left off this scale and drawn as a small grey dot; the popup shows the real value.
             </p>
           ) : null}
           <p>
-            Faded dot: the reading is 24 hours old or older. Hollow ring: no usable value to colour.
+            Pale badge: the reading is 24 hours old or older. Small grey dot: no usable value to
+            colour. Zoomed out, stations with a value are plain dots; zoom in for the numbers.
           </p>
           {showSyncedBox ? (
             <p>
@@ -195,6 +204,8 @@ export function StationMap({
   } | null>(null)
   const frame = useRef<HTMLDivElement>(null)
   const [drawing, setDrawing] = useState(false)
+  // The badge layers name an image that only exists after the style has loaded.
+  const [badgeReady, setBadgeReady] = useState(false)
   // One live region, always mounted, so a screen reader announces each change.
   const [announcement, setAnnouncement] = useState('')
   const stations = useMemo(() => layer?.stations.features ?? [], [layer])
@@ -210,7 +221,8 @@ export function StationMap({
     [visible, stations, property, now],
   )
   const range = useMemo(() => valueRange(stations, property), [stations, property])
-  const paint = useMemo(() => stationCirclePaint(range, property), [range, property])
+  const paint = useMemo(() => stationBadgePaint(range, property), [range, property])
+  const dotPaint = useMemo(() => stationDotPaint(range, property), [range, property])
   const region = useMemo(() => (draftBbox ? outline(draftBbox) : EMPTY), [draftBbox])
   // After a sync the form can be edited away from the region the stations belong to; both are drawn.
   const showSyncedBox = layerBbox !== null && !sameBox(layerBbox, draftBbox)
@@ -310,7 +322,11 @@ export function StationMap({
               ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING_BOX } }
               : { bounds: NETHERLANDS_BOUNDS, fitBoundsOptions: { padding: 16 } }
           }
-          interactiveLayerIds={['stations']}
+          interactiveLayerIds={['stations', 'stations-dot', 'stations-empty']}
+          onLoad={(event) => {
+            addBadgeImage(event.target)
+            setBadgeReady(true)
+          }}
           cursor={pointer ? 'pointer' : undefined}
           onMouseEnter={() => {
             setPointer(true)
@@ -368,24 +384,63 @@ export function StationMap({
             </Source>
           ) : null}
           <Source id="stations" type="geojson" data={data}>
-            <Layer id="stations" type="circle" paint={paint} />
             <Layer
-              id="station-values"
-              type="symbol"
-              layout={STATION_LABEL_LAYOUT}
-              paint={STATION_LABEL_PAINT}
-            />
-            <Layer
-              id="stations-selected"
+              id="stations-dot-selected"
               type="circle"
-              filter={['==', ['get', 'id'], selectedId ?? '']}
-              paint={{
-                'circle-radius': 15,
-                'circle-color': 'rgba(0, 0, 0, 0)',
-                'circle-stroke-width': 3,
-                'circle-stroke-color': '#0a7570',
-              }}
+              maxzoom={BADGE_MIN_ZOOM}
+              filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
+              paint={STATION_EMPTY_SELECTED_PAINT}
             />
+            <Layer
+              id="stations-dot"
+              type="circle"
+              maxzoom={BADGE_MIN_ZOOM}
+              filter={HAS_VALUE_FILTER}
+              layout={STATION_DOT_LAYOUT}
+              paint={dotPaint}
+            />
+            <Layer
+              id="stations-empty-selected"
+              type="circle"
+              filter={['all', NO_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
+              paint={STATION_EMPTY_SELECTED_PAINT}
+            />
+            <Layer
+              id="stations-empty"
+              type="circle"
+              filter={NO_VALUE_FILTER}
+              paint={STATION_EMPTY_PAINT}
+            />
+            {badgeReady ? (
+              <Layer
+                id="stations-selected"
+                type="symbol"
+                minzoom={BADGE_MIN_ZOOM}
+                filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
+                layout={STATION_SELECTED_LAYOUT}
+                paint={STATION_SELECTED_PAINT}
+              />
+            ) : null}
+            {badgeReady ? (
+              <Layer
+                id="stations-border"
+                type="symbol"
+                minzoom={BADGE_MIN_ZOOM}
+                filter={HAS_VALUE_FILTER}
+                layout={STATION_BORDER_LAYOUT}
+                paint={STATION_BORDER_PAINT}
+              />
+            ) : null}
+            {badgeReady ? (
+              <Layer
+                id="stations"
+                type="symbol"
+                minzoom={BADGE_MIN_ZOOM}
+                filter={HAS_VALUE_FILTER}
+                layout={STATION_BADGE_LAYOUT}
+                paint={paint}
+              />
+            ) : null}
           </Source>
         </Map>
       </div>

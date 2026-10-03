@@ -14,5 +14,6 @@ A configurable basemap style URL (`VITE_BASEMAP_STYLE_URL`), defaulting to OpenF
 - Self-hosting tiles — unneeded operational burden at this stage.
 
 ## Consequences
+- The default style changed from `liberty` to `positron` in [ADR 0016](0016-value-badge-markers-on-a-quiet-basemap.md); the host and terms are the same.
 - Re-check OpenFreeMap's terms before using this beyond local development or showing the project publicly at scale.
 - Switching providers later is a config change, not a code change.

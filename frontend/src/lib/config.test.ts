@@ -10,7 +10,7 @@ describe('BASEMAP_STYLE_URL', () => {
     vi.stubEnv('VITE_BASEMAP_STYLE_URL', undefined)
     const { BASEMAP_STYLE_URL } = await import('./config')
 
-    expect(BASEMAP_STYLE_URL).toBe('https://tiles.openfreemap.org/styles/liberty')
+    expect(BASEMAP_STYLE_URL).toBe('https://tiles.openfreemap.org/styles/positron')
   })
 
   it('uses the configured style', async () => {
@@ -24,6 +24,6 @@ describe('BASEMAP_STYLE_URL', () => {
     vi.stubEnv('VITE_BASEMAP_STYLE_URL', '')
     const { BASEMAP_STYLE_URL } = await import('./config')
 
-    expect(BASEMAP_STYLE_URL).toBe('https://tiles.openfreemap.org/styles/liberty')
+    expect(BASEMAP_STYLE_URL).toBe('https://tiles.openfreemap.org/styles/positron')
   })
 })

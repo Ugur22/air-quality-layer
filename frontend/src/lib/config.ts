@@ -4,4 +4,4 @@
  * without them the labels do not draw (the markers still do).
  */
 export const BASEMAP_STYLE_URL =
-  import.meta.env.VITE_BASEMAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/liberty'
+  import.meta.env.VITE_BASEMAP_STYLE_URL || 'https://tiles.openfreemap.org/styles/positron'

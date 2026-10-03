@@ -1,4 +1,8 @@
-import type { CircleLayerSpecification, SymbolLayerSpecification } from 'maplibre-gl'
+import type {
+  CircleLayerSpecification,
+  ExpressionSpecification,
+  SymbolLayerSpecification,
+} from 'maplibre-gl'
 import { formatValue } from '@/lib/format'
 import { isStale } from '@/lib/freshness'
 import type { StationFeature } from './types'
@@ -8,7 +12,7 @@ export interface MapStationProperties {
   name: string
   hasValue: boolean
   value: number | null
-  /** What is written next to the marker: the value, or an en dash when there is none. */
+  /** The number written in the badge; empty when there is no value, as that station has no badge. */
   label: string
   stale: boolean
 }
@@ -29,8 +33,6 @@ export interface ValueRange {
   /** Stations reporting this parameter in a different unit; they are left off the scale. */
   otherUnitCount: number
 }
-
-export const NO_VALUE_LABEL = '–'
 
 /** pm25 is the most commonly reported pollutant; otherwise the first one the layer has. */
 export function pickColourProperty(propertyKeys: string[]): string | null {
@@ -55,7 +57,7 @@ export function buildMapData(
     type: 'FeatureCollection',
     features: stations.map((station) => {
       const found = property === null ? undefined : station.properties.readings[property]
-      // A reading in another unit cannot share this colour scale, so it is shown as a hollow ring.
+      // A reading in another unit cannot share this colour scale, so it is drawn as a grey dot.
       const reading = found?.unit === unit ? found : undefined
       return {
         type: 'Feature',
@@ -65,7 +67,7 @@ export function buildMapData(
           name: station.properties.name,
           hasValue: reading !== undefined,
           value: reading?.value ?? null,
-          label: reading === undefined ? NO_VALUE_LABEL : formatValue(reading.value),
+          label: reading === undefined ? '' : formatValue(reading.value),
           stale: reading !== undefined && isStale(reading.observed_at, now),
         },
       }
@@ -166,60 +168,173 @@ export function guidelineAxisMax(classes: GuidelineClass[], dataMax: number): nu
 
 const NO_FILL = 'rgba(0, 0, 0, 0)'
 
-function guidelineFill(property: string, unit: string) {
+/** Mixes a #rrggbb colour with white; an opaque stand-in for "faded" that keeps text legible. */
+function tint(hex: string, amount = 0.6): string {
+  const channel = (i: number) => {
+    const v = parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16)
+    return Math.round(v + (255 - v) * amount)
+      .toString(16)
+      .padStart(2, '0')
+  }
+  return `#${channel(0)}${channel(1)}${channel(2)}`
+}
+
+function guidelineFill(property: string, unit: string, pale: boolean) {
   const classes = guidelineClasses(property, unit)
   if (classes === null) return null
   const last = classes[classes.length - 1]
   // `case` with `<=` keeps a value exactly on a boundary in the lower class; `step` would not.
-  const branches = classes.slice(0, -1).flatMap((c) => [['<=', ['get', 'value'], c.upTo], c.colour])
-  return ['case', ...branches, last?.colour ?? NO_FILL]
+  const paint = (colour: string) => (pale ? tint(colour) : colour)
+  const branches = classes
+    .slice(0, -1)
+    .flatMap((c) => [['<=', ['get', 'value'], c.upTo], paint(c.colour)])
+  return ['case', ...branches, last === undefined ? NO_FILL : paint(last.colour)]
 }
 
-export function stationCirclePaint(
+/** The fill colour of a station with a value: its WHO class, or the layer-relative ramp. */
+export function stationFill(
   range: ValueRange | null,
   property: string | null = null,
-): CircleLayerSpecification['paint'] {
-  const [low, mid, high] = COLOUR_STOPS
+  pale = false,
+) {
+  const [low, mid, high] = (pale ? COLOUR_STOPS.map((c) => tint(c)) : COLOUR_STOPS) as [
+    string,
+    string,
+    string,
+  ]
   // Interpolation stops must strictly ascend. A range one float step wide would make the middle
   // stop equal to an end and invalidate the whole layer, so it counts as a single value.
   const middle = range === null ? 0 : (range.min + range.max) / 2
   const hasSpread = range !== null && range.min < middle && middle < range.max
-  const classed = range === null || property === null ? null : guidelineFill(property, range.unit)
-  const fill =
+  const classed =
+    range === null || property === null ? null : guidelineFill(property, range.unit, pale)
+  return (
     classed ??
     (hasSpread
       ? ['interpolate', ['linear'], ['get', 'value'], range.min, low, middle, mid, range.max, high]
       : mid)
+  )
+}
+
+const INK = '#12201f'
+const STALE_BORDER = '#8a9a98'
+
+/**
+ * Text on the darkest fill is white; everywhere else the dark ink reads better. Classes are cut at
+ * the last break, ramps where the teal gets dark enough for white (a ramp without spread is one
+ * mid-teal).
+ */
+function badgeTextColour(range: ValueRange | null, property: string | null) {
+  const classes = range === null ? null : guidelineClasses(property, range.unit)
+  const darkFrom =
+    classes !== null
+      ? classes.at(-2)?.upTo
+      : range !== null && range.min < range.max
+        ? range.min + (range.max - range.min) * 0.65
+        : undefined
+  return darkFrom === undefined ? INK : ['case', ['>', ['get', 'value'], darkFrom], '#ffffff', INK]
+}
+
+/** Image registered on the map at load (see badgeImage.ts); stations with a value draw it. */
+export const BADGE_IMAGE = 'station-badge'
+/**
+ * Below this zoom a station is a plain dot: badges would overprint each other, and a number that
+ * cannot be read is worse than none. At and above it the badge shows the value.
+ */
+export const BADGE_MIN_ZOOM = 11
+export const HAS_VALUE_FILTER: ExpressionSpecification = ['get', 'hasValue']
+export const NO_VALUE_FILTER: ExpressionSpecification = ['!', HAS_VALUE_FILTER]
+
+// The highest value is drawn on top where badges overlap.
+const SORT_KEY: ExpressionSpecification = ['get', 'value']
+
+function badgeLayout(padding: [number, number]): SymbolLayerSpecification['layout'] {
   return {
-    'circle-radius': 9,
-    // No value for this property: an empty ring, so the station is still visible.
-    'circle-color': ['case', ['get', 'hasValue'], fill, NO_FILL],
-    // A stale reading is faded, not hidden.
-    'circle-opacity': ['case', ['get', 'stale'], 0.45, 1],
-    'circle-stroke-width': 2,
-    'circle-stroke-color': ['case', ['get', 'hasValue'], '#12201f', '#4d6360'],
-    'circle-stroke-opacity': ['case', ['get', 'stale'], 0.45, 1],
+    'icon-image': BADGE_IMAGE,
+    'icon-text-fit': 'both',
+    'icon-text-fit-padding': [padding[0], padding[1], padding[0], padding[1]],
+    'icon-allow-overlap': true,
+    'icon-ignore-placement': true,
+    'text-field': ['get', 'label'],
+    'text-font': ['Noto Sans Bold'],
+    'text-size': ['interpolate', ['linear'], ['zoom'], BADGE_MIN_ZOOM, 9.5, 14, 12],
+    'text-allow-overlap': true,
+    'text-ignore-placement': true,
+    'symbol-sort-key': SORT_KEY,
+  }
+}
+
+/** The fill, and the text drawn on it. */
+export const STATION_BADGE_LAYOUT = badgeLayout([1, 5])
+/** Same text under a slightly larger pill, so it shows as a 2px border. Collisions of the numbers themselves are not resolved: a symbol layer draws all icons, then all text. */
+export const STATION_BORDER_LAYOUT = badgeLayout([3, 7])
+/** A third, larger pill in the accent colour marks the selected station. */
+export const STATION_SELECTED_LAYOUT = badgeLayout([7, 11])
+
+export function stationBadgePaint(
+  range: ValueRange | null,
+  property: string | null = null,
+): SymbolLayerSpecification['paint'] {
+  return {
+    // A stale reading is a paler tint of its colour, opaque so it does not blend with the border.
+    'icon-color': [
+      'case',
+      ['get', 'stale'],
+      stationFill(range, property, true),
+      stationFill(range, property),
+    ],
+    'text-color': ['case', ['get', 'stale'], INK, badgeTextColour(range, property)],
+  } as SymbolLayerSpecification['paint']
+}
+
+export const STATION_BORDER_PAINT = {
+  'icon-color': ['case', ['get', 'stale'], STALE_BORDER, INK],
+  // The text is drawn by the fill layer above; this one only sizes the pill.
+  'text-opacity': 0,
+} as SymbolLayerSpecification['paint']
+
+export const STATION_SELECTED_PAINT = {
+  'icon-color': '#0a7570',
+  'text-opacity': 0,
+} as SymbolLayerSpecification['paint']
+
+/**
+ * A station without a usable value is a small grey dot with no number: it stays visible and
+ * clickable but does not compete with the readings.
+ */
+// The highest value is drawn on top where dots overlap.
+export const STATION_DOT_LAYOUT = {
+  'circle-sort-key': ['get', 'value'],
+} as CircleLayerSpecification['layout']
+
+/** The zoomed-out form of a station with a value: the same colours, no number. */
+export function stationDotPaint(
+  range: ValueRange | null,
+  property: string | null = null,
+): CircleLayerSpecification['paint'] {
+  return {
+    'circle-radius': 6,
+    'circle-color': [
+      'case',
+      ['get', 'stale'],
+      stationFill(range, property, true),
+      stationFill(range, property),
+    ],
+    'circle-stroke-width': 1.5,
+    'circle-stroke-color': ['case', ['get', 'stale'], STALE_BORDER, INK],
   } as CircleLayerSpecification['paint']
 }
 
-/**
- * The number beside each marker. It sits to the right instead of inside, because a circle small
- * enough to be a marker cannot hold a value like 316. Where labels collide the highest value
- * is kept, and the marker itself is never hidden.
- */
-export const STATION_LABEL_LAYOUT = {
-  'text-field': ['get', 'label'],
-  'text-font': ['Noto Sans Bold'],
-  'text-size': 12,
-  'text-anchor': 'left',
-  'text-offset': [1.7, 0],
-  // Highest value first; a station without one goes last, so a dash never pushes out a number.
-  'symbol-sort-key': ['case', ['get', 'hasValue'], ['*', -1, ['get', 'value']], 1e9],
-} as SymbolLayerSpecification['layout']
+export const STATION_EMPTY_SELECTED_PAINT = {
+  'circle-radius': 9,
+  'circle-color': 'rgba(0, 0, 0, 0)',
+  'circle-stroke-width': 3,
+  'circle-stroke-color': '#0a7570',
+} as CircleLayerSpecification['paint']
 
-export const STATION_LABEL_PAINT = {
-  'text-color': '#12201f',
-  'text-halo-color': '#ffffff',
-  'text-halo-width': 2,
-  'text-opacity': ['case', ['get', 'stale'], 0.45, 1],
-} as SymbolLayerSpecification['paint']
+export const STATION_EMPTY_PAINT = {
+  'circle-radius': 4.5,
+  'circle-color': '#b4c0be',
+  'circle-stroke-width': 1.5,
+  'circle-stroke-color': '#4d6360',
+} as CircleLayerSpecification['paint']

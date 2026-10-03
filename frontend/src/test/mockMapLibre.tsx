@@ -1,4 +1,4 @@
-import { useImperativeHandle, type ReactNode, type Ref } from 'react'
+import { useEffect, useImperativeHandle, type ReactNode, type Ref } from 'react'
 import { FAKE_MAP, mapSpies } from './mapSpies'
 
 /**
@@ -16,6 +16,8 @@ export function Map({
   onClick,
   onMouseMove,
   onMouseLeave,
+  onLoad,
+  interactiveLayerIds,
   mapStyle,
   initialViewState,
   ref,
@@ -24,6 +26,8 @@ export function Map({
   onClick?: (event: ClickEvent) => void
   onMouseMove?: (event: ClickEvent & { point: { x: number; y: number } }) => void
   onMouseLeave?: () => void
+  onLoad?: (event: { target: unknown }) => void
+  interactiveLayerIds?: string[]
   mapStyle?: string
   initialViewState?: unknown
   ref?: Ref<{ fitBounds: typeof mapSpies.fitBounds; getMap: () => unknown }>
@@ -32,9 +36,15 @@ export function Map({
     fitBounds: mapSpies.fitBounds,
     getMap: () => FAKE_MAP,
   }))
+  useEffect(() => {
+    if (!mapSpies.holdLoad) onLoad?.({ target: FAKE_MAP })
+    // The real map loads once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <div
       data-testid="map"
+      data-interactive={(interactiveLayerIds ?? []).join(' ')}
       data-style={mapStyle}
       data-initial-view={JSON.stringify(initialViewState ?? null)}
     >
@@ -104,12 +114,29 @@ export function Source({
   )
 }
 
-export function Layer({ id, paint, layout }: { id: string; paint?: unknown; layout?: unknown }) {
+export function Layer({
+  id,
+  paint,
+  layout,
+  filter,
+  minzoom,
+  maxzoom,
+}: {
+  id: string
+  paint?: unknown
+  layout?: unknown
+  filter?: unknown
+  minzoom?: number
+  maxzoom?: number
+}) {
   return (
     <div
       data-testid={`layer-${id}`}
       data-paint={JSON.stringify(paint ?? {})}
       data-layout={JSON.stringify(layout ?? {})}
+      data-filter={JSON.stringify(filter ?? null)}
+      data-minzoom={minzoom}
+      data-maxzoom={maxzoom}
     />
   )
 }
