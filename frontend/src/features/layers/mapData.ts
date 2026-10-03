@@ -237,104 +237,95 @@ function badgeTextColour(range: ValueRange | null, property: string | null) {
 
 /** Image registered on the map at load (see badgeImage.ts); stations with a value draw it. */
 export const BADGE_IMAGE = 'station-badge'
-/**
- * Below this zoom a station is a plain dot: badges would overprint each other, and a number that
- * cannot be read is worse than none. At and above it the badge shows the value.
- */
-export const BADGE_MIN_ZOOM = 11
 export const HAS_VALUE_FILTER: ExpressionSpecification = ['get', 'hasValue']
 export const NO_VALUE_FILTER: ExpressionSpecification = ['!', HAS_VALUE_FILTER]
 
-// The highest value is drawn on top where badges overlap.
-const SORT_KEY: ExpressionSpecification = ['get', 'value']
-
-function badgeLayout(padding: [number, number]): SymbolLayerSpecification['layout'] {
-  return {
-    'icon-image': BADGE_IMAGE,
-    'icon-text-fit': 'both',
-    'icon-text-fit-padding': [padding[0], padding[1], padding[0], padding[1]],
-    'icon-allow-overlap': true,
-    'icon-ignore-placement': true,
-    'text-field': ['get', 'label'],
-    'text-font': ['Noto Sans Bold'],
-    'text-size': ['interpolate', ['linear'], ['zoom'], BADGE_MIN_ZOOM, 9.5, 14, 12],
-    'text-allow-overlap': true,
-    'text-ignore-placement': true,
-    'symbol-sort-key': SORT_KEY,
-  }
+/** A stale reading is a paler tint of its colour, opaque so text on it stays legible. */
+function stationColour(range: ValueRange | null, property: string | null): ExpressionSpecification {
+  return [
+    'case',
+    ['get', 'stale'],
+    stationFill(range, property, true),
+    stationFill(range, property),
+  ] as ExpressionSpecification
 }
 
-/** The fill, and the text drawn on it. */
-export const STATION_BADGE_LAYOUT = badgeLayout([1, 5])
-/** Same text under a slightly larger pill, so it shows as a 2px border. Collisions of the numbers themselves are not resolved: a symbol layer draws all icons, then all text. */
-export const STATION_BORDER_LAYOUT = badgeLayout([3, 7])
-/** A third, larger pill in the accent colour marks the selected station. */
-export const STATION_SELECTED_LAYOUT = badgeLayout([7, 11])
+const BORDER_COLOUR: ExpressionSpecification = ['case', ['get', 'stale'], STALE_BORDER, INK]
+
+/**
+ * Badges do not overlap: where two collide, the one with the higher value keeps its place (symbols
+ * with a lower sort key are placed first) and the other is left to its dot underneath until the
+ * map is zoomed in. The map's own labels yield to the badges, not the other way round.
+ */
+export const STATION_BADGE_LAYOUT = {
+  'icon-image': BADGE_IMAGE,
+  'icon-text-fit': 'both',
+  'icon-text-fit-padding': [1, 5, 1, 5],
+  'icon-allow-overlap': false,
+  'text-field': ['get', 'label'],
+  'text-font': ['Noto Sans Bold'],
+  'text-size': ['interpolate', ['linear'], ['zoom'], 9, 9.5, 14, 12],
+  'text-allow-overlap': false,
+  'symbol-sort-key': ['*', -1, ['get', 'value']],
+} as SymbolLayerSpecification['layout']
 
 export function stationBadgePaint(
   range: ValueRange | null,
   property: string | null = null,
 ): SymbolLayerSpecification['paint'] {
   return {
-    // A stale reading is a paler tint of its colour, opaque so it does not blend with the border.
-    'icon-color': [
-      'case',
-      ['get', 'stale'],
-      stationFill(range, property, true),
-      stationFill(range, property),
-    ],
+    'icon-color': stationColour(range, property),
+    // The border is the SDF halo of the same pill, so it is placed or dropped with it.
+    'icon-halo-color': BORDER_COLOUR,
+    'icon-halo-width': 1.5,
     'text-color': ['case', ['get', 'stale'], INK, badgeTextColour(range, property)],
   } as SymbolLayerSpecification['paint']
 }
 
-export const STATION_BORDER_PAINT = {
-  'icon-color': ['case', ['get', 'stale'], STALE_BORDER, INK],
-  // The text is drawn by the fill layer above; this one only sizes the pill.
-  'text-opacity': 0,
-} as SymbolLayerSpecification['paint']
-
-export const STATION_SELECTED_PAINT = {
-  'icon-color': '#0a7570',
-  'text-opacity': 0,
-} as SymbolLayerSpecification['paint']
-
 /**
- * A station without a usable value is a small grey dot with no number: it stays visible and
- * clickable but does not compete with the readings.
+ * Every station with a value has a dot, drawn under the badges: a station whose badge lost a
+ * collision is still on the map, hoverable and clickable. The highest value is on top.
  */
-// The highest value is drawn on top where dots overlap.
 export const STATION_DOT_LAYOUT = {
   'circle-sort-key': ['get', 'value'],
 } as CircleLayerSpecification['layout']
 
-/** The zoomed-out form of a station with a value: the same colours, no number. */
 export function stationDotPaint(
   range: ValueRange | null,
   property: string | null = null,
 ): CircleLayerSpecification['paint'] {
   return {
     'circle-radius': 6,
-    'circle-color': [
-      'case',
-      ['get', 'stale'],
-      stationFill(range, property, true),
-      stationFill(range, property),
-    ],
+    'circle-color': stationColour(range, property),
     'circle-stroke-width': 1.5,
-    'circle-stroke-color': ['case', ['get', 'stale'], STALE_BORDER, INK],
-  } as CircleLayerSpecification['paint']
+    'circle-stroke-color': BORDER_COLOUR,
+  }
 }
 
-export const STATION_EMPTY_SELECTED_PAINT = {
-  'circle-radius': 9,
+const SELECTED_STROKE = {
   'circle-color': 'rgba(0, 0, 0, 0)',
   'circle-stroke-width': 3,
   'circle-stroke-color': '#0a7570',
+}
+
+/** Ring around the selected station: wide enough to clear its badge, and shown with or without it. */
+export const STATION_SELECTED_PAINT = {
+  ...SELECTED_STROKE,
+  'circle-radius': 15,
 } as CircleLayerSpecification['paint']
 
+/**
+ * A station without a usable value is a small grey dot with no number: it stays visible and
+ * clickable but does not compete with the readings.
+ */
 export const STATION_EMPTY_PAINT = {
   'circle-radius': 4.5,
   'circle-color': '#b4c0be',
   'circle-stroke-width': 1.5,
   'circle-stroke-color': '#4d6360',
+} as CircleLayerSpecification['paint']
+
+export const STATION_EMPTY_SELECTED_PAINT = {
+  ...SELECTED_STROKE,
+  'circle-radius': 9,
 } as CircleLayerSpecification['paint']

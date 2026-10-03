@@ -88,7 +88,7 @@ describe('StationMap', () => {
       expect.anything(),
       expect.objectContaining({ sdf: true }),
     )
-    for (const id of ['stations', 'stations-border', 'stations-selected', 'stations-empty']) {
+    for (const id of ['stations', 'stations-dot', 'stations-selected', 'stations-empty']) {
       expect(screen.getByTestId(`layer-${id}`)).toBeInTheDocument()
     }
   })
@@ -107,7 +107,6 @@ describe('StationMap', () => {
     )
 
     expect(screen.queryByTestId('layer-stations')).not.toBeInTheDocument()
-    expect(screen.queryByTestId('layer-stations-border')).not.toBeInTheDocument()
     expect(mapSpies.addImage).not.toHaveBeenCalled()
   })
 
@@ -128,7 +127,7 @@ describe('StationMap', () => {
     )
   })
 
-  it('hands over from plain dots to value badges at one zoom, so the two never overlap', () => {
+  it('keeps a dot under every badge, so a station that loses a collision stays on the map', () => {
     render(
       <StationMap
         layer={layer}
@@ -140,12 +139,16 @@ describe('StationMap', () => {
       />,
     )
 
-    const zoom = (id: string, edge: 'minzoom' | 'maxzoom') =>
-      screen.getByTestId(`layer-${id}`).getAttribute(`data-${edge}`)
-    expect(zoom('stations-dot', 'maxzoom')).toBe(zoom('stations', 'minzoom'))
-    expect(zoom('stations-border', 'minzoom')).toBe(zoom('stations', 'minzoom'))
-    expect(zoom('stations-selected', 'minzoom')).toBe(zoom('stations', 'minzoom'))
-    expect(zoom('stations', 'minzoom')).not.toBeNull()
+    const layout = JSON.parse(
+      screen.getByTestId('layer-stations').getAttribute('data-layout') ?? '{}',
+    ) as Record<string, unknown>
+    expect(layout['icon-allow-overlap']).toBe(false)
+    expect(layout['text-allow-overlap']).toBe(false)
+    // Higher values are placed first, so they keep their badge.
+    expect(layout['symbol-sort-key']).toEqual(['*', -1, ['get', 'value']])
+    const dot = screen.getByTestId('layer-stations-dot')
+    expect(dot.getAttribute('data-minzoom')).toBeNull()
+    expect(dot.getAttribute('data-filter')).toContain('hasValue')
   })
 
   it('rings the selected station whether it is a badge or a dot', () => {

@@ -119,15 +119,11 @@ export function Layer({
   paint,
   layout,
   filter,
-  minzoom,
-  maxzoom,
 }: {
   id: string
   paint?: unknown
   layout?: unknown
   filter?: unknown
-  minzoom?: number
-  maxzoom?: number
 }) {
   return (
     <div
@@ -135,8 +131,6 @@ export function Layer({
       data-paint={JSON.stringify(paint ?? {})}
       data-layout={JSON.stringify(layout ?? {})}
       data-filter={JSON.stringify(filter ?? null)}
-      data-minzoom={minzoom}
-      data-maxzoom={maxzoom}
     />
   )
 }

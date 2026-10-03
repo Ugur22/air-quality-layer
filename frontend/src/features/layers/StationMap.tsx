@@ -10,16 +10,12 @@ import {
   buildMapData,
   COLOUR_STOPS,
   guidelineClasses,
-  BADGE_MIN_ZOOM,
   HAS_VALUE_FILTER,
   NO_VALUE_FILTER,
   STATION_BADGE_LAYOUT,
-  STATION_BORDER_LAYOUT,
-  STATION_BORDER_PAINT,
   STATION_DOT_LAYOUT,
   STATION_EMPTY_PAINT,
   STATION_EMPTY_SELECTED_PAINT,
-  STATION_SELECTED_LAYOUT,
   STATION_SELECTED_PAINT,
   stationBadgePaint,
   stationDotPaint,
@@ -151,7 +147,7 @@ function Legend({
           ) : null}
           <p>
             Pale badge: the reading is 24 hours old or older. Small grey dot: no usable value to
-            colour. Zoomed out, stations with a value are plain dots; zoom in for the numbers.
+            colour. Where badges would overlap, the lower value shows as a dot until you zoom in.
           </p>
           {showSyncedBox ? (
             <p>
@@ -385,25 +381,23 @@ export function StationMap({
           ) : null}
           <Source id="stations" type="geojson" data={data}>
             <Layer
-              id="stations-dot-selected"
+              id="stations-selected"
               type="circle"
-              maxzoom={BADGE_MIN_ZOOM}
               filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
-              paint={STATION_EMPTY_SELECTED_PAINT}
-            />
-            <Layer
-              id="stations-dot"
-              type="circle"
-              maxzoom={BADGE_MIN_ZOOM}
-              filter={HAS_VALUE_FILTER}
-              layout={STATION_DOT_LAYOUT}
-              paint={dotPaint}
+              paint={STATION_SELECTED_PAINT}
             />
             <Layer
               id="stations-empty-selected"
               type="circle"
               filter={['all', NO_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
               paint={STATION_EMPTY_SELECTED_PAINT}
+            />
+            <Layer
+              id="stations-dot"
+              type="circle"
+              filter={HAS_VALUE_FILTER}
+              layout={STATION_DOT_LAYOUT}
+              paint={dotPaint}
             />
             <Layer
               id="stations-empty"
@@ -413,29 +407,8 @@ export function StationMap({
             />
             {badgeReady ? (
               <Layer
-                id="stations-selected"
-                type="symbol"
-                minzoom={BADGE_MIN_ZOOM}
-                filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
-                layout={STATION_SELECTED_LAYOUT}
-                paint={STATION_SELECTED_PAINT}
-              />
-            ) : null}
-            {badgeReady ? (
-              <Layer
-                id="stations-border"
-                type="symbol"
-                minzoom={BADGE_MIN_ZOOM}
-                filter={HAS_VALUE_FILTER}
-                layout={STATION_BORDER_LAYOUT}
-                paint={STATION_BORDER_PAINT}
-              />
-            ) : null}
-            {badgeReady ? (
-              <Layer
                 id="stations"
                 type="symbol"
-                minzoom={BADGE_MIN_ZOOM}
                 filter={HAS_VALUE_FILTER}
                 layout={STATION_BADGE_LAYOUT}
                 paint={paint}

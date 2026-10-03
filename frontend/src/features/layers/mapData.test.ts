@@ -9,7 +9,6 @@ import {
   guidelineAxisMax,
   guidelineClasses,
   pickColourProperty,
-  STATION_BORDER_PAINT,
   stationBadgePaint,
   stationFill,
   STATION_BADGE_LAYOUT,
@@ -220,7 +219,6 @@ describe('stationBadgePaint', () => {
           layout: STATION_BADGE_LAYOUT,
           paint: stationBadgePaint(range, property),
         },
-        { id: 'border', type: 'symbol', source: 's', paint: STATION_BORDER_PAINT },
         { id: 'empty', type: 'circle', source: 's', paint: STATION_EMPTY_PAINT },
         {
           id: 'dot',
@@ -257,6 +255,13 @@ describe('stationBadgePaint', () => {
     ['a range one float step wide', { min: 1, max: 1 + Number.EPSILON, ...base }],
   ])('falls back to one colour for %s instead of an invalid scale', (_label, range) => {
     expect(JSON.stringify(stationFill(range))).not.toContain('interpolate')
+  })
+
+  it('draws the border as the badge’s own halo, so it is placed or dropped with it', () => {
+    const paint = stationBadgePaint({ min: 0, max: 10, unit: 'µg/m³', otherUnitCount: 0 })
+
+    expect(paint?.['icon-halo-width']).toBeGreaterThan(0)
+    expect(JSON.stringify(paint?.['icon-halo-color'])).toContain('stale')
   })
 
   it('tints a stale reading paler, opaquely, so text on it stays legible', () => {
