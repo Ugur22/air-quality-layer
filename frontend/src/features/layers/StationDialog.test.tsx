@@ -55,6 +55,51 @@ describe('StationDialog', () => {
     expect(dialog).toHaveTextContent('latest 2 h ago')
   })
 
+  it('writes south and west coordinates with their hemisphere instead of a minus sign', () => {
+    open({ ...first, geometry: { type: 'Point', coordinates: [-70.6693, -33.4489] } })
+
+    expect(screen.getByRole('dialog')).toHaveTextContent('33.4489°S, 70.6693°W')
+  })
+
+  it('moves between the tabs with the arrow keys, Home and End, keeping only one in the Tab order', async () => {
+    mockApi({ [HISTORY_ROUTE]: () => jsonResponse(200, { history: history() }) })
+    const user = userEvent.setup()
+    open()
+    const overview = screen.getByRole('tab', { name: 'Overview' })
+    const trend = screen.getByRole('tab', { name: 'Trend' })
+    expect(overview).toHaveAttribute('tabindex', '0')
+    expect(trend).toHaveAttribute('tabindex', '-1')
+
+    overview.focus()
+    await user.keyboard('{ArrowRight}')
+    expect(trend).toHaveFocus()
+    expect(trend).toHaveAttribute('aria-selected', 'true')
+    expect(trend).toHaveAttribute('tabindex', '0')
+
+    await user.keyboard('{ArrowRight}')
+    expect(overview).toHaveFocus()
+    await user.keyboard('{End}')
+    expect(trend).toHaveFocus()
+    await user.keyboard('{Home}')
+    expect(overview).toHaveFocus()
+    await user.keyboard('{ArrowLeft}')
+    expect(trend).toHaveFocus()
+  })
+
+  it('describes the trend chart with its values, not only its topic', async () => {
+    mockApi({ [HISTORY_ROUTE]: () => jsonResponse(200, { history: history() }) })
+    const user = userEvent.setup()
+    open()
+
+    await user.click(screen.getByRole('tab', { name: 'Trend' }))
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'pm25 over the last 24 hours: latest 10.9 µg/m³, lowest 4.5, highest 31',
+      }),
+    ).toBeInTheDocument()
+  })
+
   it('closes from the close button and from Escape', async () => {
     const user = userEvent.setup()
     const onClose = open()

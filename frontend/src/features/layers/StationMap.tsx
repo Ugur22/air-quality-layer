@@ -20,6 +20,8 @@ import { StationTooltip } from './StationTooltip'
 import type { MapLayerResponse } from './types'
 
 // The legend floats over the bottom-left corner, so a fitted region leaves room under it.
+// Room a tooltip needs next to the pointer before it would run off the map.
+const TOOLTIP_ROOM = { width: 260, height: 100 }
 const FIT_PADDING_BOX = { top: 48, right: 48, bottom: 120, left: 48 }
 // Roughly the Netherlands, for when there is neither a layer nor a usable box to look at.
 const DEFAULT_VIEW = { longitude: 5.3, latitude: 52.2, zoom: 6 }
@@ -160,7 +162,14 @@ export function StationMap({
   const mapRef = useRef<MapRef>(null)
   const [pointer, setPointer] = useState(false)
   // The station under the pointer and where, for the tooltip.
-  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null)
+  const [hover, setHover] = useState<{
+    id: string
+    x: number
+    y: number
+    flipX: boolean
+    flipY: boolean
+  } | null>(null)
+  const frame = useRef<HTMLDivElement>(null)
   const [drawing, setDrawing] = useState(false)
   // One live region, always mounted, so a screen reader announces each change.
   const [announcement, setAnnouncement] = useState('')
@@ -233,7 +242,7 @@ export function StationMap({
 
   const startBbox = layerBbox ?? draftBbox
   return (
-    <div className="relative h-full overflow-hidden bg-surface">
+    <div ref={frame} className="relative h-full overflow-hidden bg-surface">
       <div className="absolute inset-0">
         {onBoxDrawn ? (
           // Only the button takes pointer events: the rest of this overlay must not block a drag that
@@ -284,9 +293,19 @@ export function StationMap({
           }}
           onMouseMove={(event) => {
             const id: unknown = event.features?.[0]?.properties.id
+            const { x, y } = event.point
+            // Near the right or bottom edge the tooltip goes to the other side of the pointer.
+            const width = frame.current?.clientWidth ?? 0
+            const height = frame.current?.clientHeight ?? 0
             setHover(
               typeof id === 'string' && !drawing
-                ? { id, x: event.point.x, y: event.point.y }
+                ? {
+                    id,
+                    x,
+                    y,
+                    flipX: width > 0 && x + TOOLTIP_ROOM.width > width,
+                    flipY: height > 0 && y + TOOLTIP_ROOM.height > height,
+                  }
                 : null,
             )
           }}
@@ -297,6 +316,7 @@ export function StationMap({
           onClick={(event) => {
             // A drag in drawing mode must not select (or deselect) a station.
             if (drawing) return
+            setHover(null)
             const id: unknown = event.features?.[0]?.properties.id
             onSelect(typeof id === 'string' ? id : null)
           }}
@@ -346,7 +366,16 @@ export function StationMap({
         </Map>
       </div>
       {hovered && hover ? (
-        <StationTooltip station={hovered} property={property} now={now} x={hover.x} y={hover.y} />
+        <StationTooltip
+          station={hovered}
+          property={property}
+          unit={range?.unit}
+          now={now}
+          x={hover.x}
+          y={hover.y}
+          flipX={hover.flipX}
+          flipY={hover.flipY}
+        />
       ) : null}
       {layer ? <Legend property={property} range={range} showSyncedBox={showSyncedBox} /> : null}
     </div>

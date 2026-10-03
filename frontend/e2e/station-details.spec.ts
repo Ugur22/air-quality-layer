@@ -133,6 +133,14 @@ test('a station opens a dialog whose trend tab draws the last day', async ({ pag
   await expect(dialog.getByText('Latest', { exact: true })).toBeVisible()
   expect(asked).toBe(1)
 
+  // A chart is not keyboard-operable and is described in text, so it must not be a Tab stop that
+  // assistive technology cannot see (Recharts adds tabindex=0 unless accessibilityLayer is off;
+  // its tabindex=-1 layer groups are not in the Tab order).
+  await expect(dialog.locator('svg[tabindex="0"], svg [tabindex="0"]')).toHaveCount(0)
+  await dialog.getByRole('tab', { name: 'Overview' }).click()
+  await expect(dialog.locator('svg[tabindex="0"], svg [tabindex="0"]')).toHaveCount(0)
+  await dialog.getByRole('tab', { name: 'Trend' }).click()
+
   await page.keyboard.press('Escape')
   await expect(page.getByRole('dialog')).toHaveCount(0)
 })

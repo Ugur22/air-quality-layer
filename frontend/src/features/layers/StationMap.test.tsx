@@ -181,6 +181,51 @@ describe('StationMap', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
+  it('clears the tooltip when a station is clicked', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'map: click first station' }))
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('puts the tooltip on the other side of the pointer near the right and bottom edges', async () => {
+    const width = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get').mockReturnValue(100)
+    const height = vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(100)
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+
+    // The pointer is at (10, 20) in a 100 by 100 map, too small for the tooltip on its right.
+    const tip = screen.getByRole('tooltip')
+    expect(tip).toHaveStyle({ left: '-4px', top: '6px' })
+    expect(tip.style.transform).toBe('translate(-100%, -100%)')
+    width.mockRestore()
+    height.mockRestore()
+  })
+
   it('says a station has no reading of the property in its tooltip', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     render(

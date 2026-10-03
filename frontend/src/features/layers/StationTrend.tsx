@@ -78,7 +78,7 @@ export function StationTrend({
     )
   }
 
-  const { points, unit, from, to } = history.data
+  const { points, unit } = history.data
   if (points.length === 0) {
     return (
       <p className="text-sm text-muted">
@@ -99,22 +99,28 @@ export function StationTrend({
   return (
     <div className="flex flex-col gap-4">
       <div
-        className="h-52 w-full"
+        className="h-80 w-full"
         role="img"
-        aria-label={`${property} over the last ${String(HISTORY_HOURS)} hours`}
+        aria-label={`${property} over the last ${String(HISTORY_HOURS)} hours: latest ${formatValue(latest.value)} ${unitText}, lowest ${formatValue(low)}, highest ${formatValue(high)}`}
       >
         <ResponsiveContainer
           width="100%"
           height="100%"
-          initialDimension={{ width: 480, height: 208 }}
+          initialDimension={{ width: 760, height: 320 }}
         >
-          <AreaChart data={data} margin={{ top: 8, right: 12, bottom: 0, left: 0 }}>
+          <AreaChart
+            accessibilityLayer={false}
+            data={data}
+            margin={{ top: 8, right: 12, bottom: 0, left: 0 }}
+          >
             <CartesianGrid vertical={false} stroke="var(--color-line)" strokeDasharray="2 4" />
             <XAxis
               dataKey="t"
               type="number"
               scale="time"
-              domain={[new Date(from).getTime(), new Date(to).getTime()]}
+              // The axis follows the data, not the requested window: OpenAQ's hourly values lag
+              // the clock, and an axis running to "now" would leave an empty strip on the right.
+              domain={['dataMin', 'dataMax']}
               tickFormatter={(t: number) => TIME.format(t)}
               tick={AXIS_TICK}
               tickLine={false}

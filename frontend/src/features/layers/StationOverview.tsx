@@ -92,13 +92,16 @@ export function StationOverview({
           <p className="sr-only">
             {`${property} here is ${formatValue(own.value)} ${own.unit}, ${ordinal(rank ?? 1)} highest of ${String(values.length)}. The median is ${formatValue(mid)}.`}
           </p>
-          <div className="h-28 w-full" aria-hidden>
+          <div className="h-40 w-full" aria-hidden>
             <ResponsiveContainer
               width="100%"
               height="100%"
-              initialDimension={{ width: 480, height: 112 }}
+              initialDimension={{ width: 760, height: 160 }}
             >
-              <ScatterChart margin={{ top: 22, right: 14, bottom: 0, left: 14 }}>
+              <ScatterChart
+                accessibilityLayer={false}
+                margin={{ top: 22, right: 14, bottom: 0, left: 14 }}
+              >
                 <XAxis
                   type="number"
                   dataKey="value"
