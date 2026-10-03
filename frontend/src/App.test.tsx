@@ -75,7 +75,12 @@ describe('App', () => {
       expect(outline.features).toEqual([])
       expect(screen.getByText(/search for a place, or choose “draw region”/i)).toBeInTheDocument()
       expect(screen.getByRole('button', { name: /create region and sync/i })).toBeDisabled()
-      expect(screen.getByText(/search for a place or draw an area on the map first/i)).toBeVisible()
+      expect(
+        screen.getByText(/search for a place, draw an area on the map, or enter coordinates/i),
+      ).toBeVisible()
+      expect(
+        screen.getByRole('button', { name: /create region and sync/i }),
+      ).toHaveAccessibleDescription(/search for a place, draw an area/i)
     })
 
     it('keeps the coordinates under "Custom area" until asked for', async () => {
@@ -117,8 +122,49 @@ describe('App', () => {
       renderApp()
 
       expect(await screen.findByLabelText(/West/)).toHaveValue('west')
-      expect(screen.getByRole('button', { name: 'Custom area' })).toBeDisabled()
+      const toggle = screen.getByRole('button', { name: 'Custom area' })
+      expect(toggle).toHaveAttribute('aria-disabled', 'true')
+      expect(toggle).toHaveAccessibleDescription(/fix the box below/i)
       expect(screen.getByText(/this box cannot be used/i)).toBeInTheDocument()
+
+      await userEvent.click(toggle)
+
+      expect(screen.getByLabelText(/West/)).toBeInTheDocument()
+    })
+
+    it('does not point at the section while it is closed', async () => {
+      mockApi({ ...baseRoutes })
+      renderApp()
+
+      const toggle = await screen.findByRole('button', { name: 'Custom area' })
+      expect(toggle).not.toHaveAttribute('aria-controls')
+    })
+
+    it('lets the section be closed again once a box that was wrong has been fixed', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      useSession.setState({
+        draft: { ...amsterdamDraft, minLon: '5', maxLon: '4' },
+        customAreaOpen: false,
+      })
+      renderApp()
+      await user.click(await screen.findByRole('button', { name: /create region and sync/i }))
+      expect(await screen.findByText('West must be smaller than east.')).toBeInTheDocument()
+
+      const west = screen.getByLabelText(/West/)
+      await user.clear(west)
+      await user.type(west, '4.85')
+      await user.clear(screen.getByLabelText(/East/))
+      await user.type(screen.getByLabelText(/East/), '4.95')
+
+      // The old error does not outlive the fix; the section stays open for what is being typed,
+      // and the toggle works again.
+      expect(screen.queryByText('West must be smaller than east.')).not.toBeInTheDocument()
+      expect(screen.getByLabelText(/East/)).toHaveValue('4.95')
+      const toggle = screen.getByRole('button', { name: 'Custom area' })
+      expect(toggle).not.toHaveAttribute('aria-disabled', 'true')
+      await user.click(toggle)
+      expect(screen.queryByLabelText(/West/)).not.toBeInTheDocument()
     })
 
     it('fills the coordinates, names the region and opens "Custom area" when an area is drawn', async () => {
@@ -157,7 +203,7 @@ describe('App', () => {
       expect(await screen.findByLabelText('Name')).toHaveValue('My area')
     })
 
-    it('opens the first invalid field when a submit fails, even from a collapsed section', async () => {
+    it('focuses the name when a submit fails on it while the coordinates are collapsed', async () => {
       mockApi({ ...baseRoutes })
       const user = userEvent.setup()
       useSession.setState({ draft: { ...amsterdamDraft, name: '' }, customAreaOpen: false })
@@ -704,7 +750,12 @@ describe('App', () => {
         apiError(503, 'service_unavailable', 'Place search is unavailable right now.'),
     })
     const user = userEvent.setup()
+    useSession.setState({ draft: EMPTY_DRAFT, customAreaOpen: false })
     renderApp()
+    expect(await screen.findByRole('button', { name: 'Custom area' })).toHaveAttribute(
+      'aria-expanded',
+      'false',
+    )
 
     await user.type(await screen.findByRole('combobox', { name: /search for a place/i }), 'utrecht')
     expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/i)
@@ -714,6 +765,11 @@ describe('App', () => {
       'aria-expanded',
       'true',
     )
+    await user.type(screen.getByLabelText('Name'), 'Typed area')
+    await user.type(screen.getByLabelText(/West/), '4.85')
+    await user.type(screen.getByLabelText(/South/), '52.35')
+    await user.type(screen.getByLabelText(/East/), '4.95')
+    await user.type(screen.getByLabelText(/North/), '52.4')
     await user.click(screen.getByRole('button', { name: /create region and sync/i }))
 
     expect(await screen.findByTestId('map')).toBeInTheDocument()

@@ -387,12 +387,12 @@ describe('PlaceSearchBox', () => {
     expect(screen.getByRole('status')).toHaveTextContent(/name was kept/i)
   })
 
-  it('replaces the example name, an empty name and the name of a previously chosen place', async () => {
+  it('replaces an empty name and the name of a previously chosen place', async () => {
     mockApi({ [ROUTE]: places(AMSTERDAM) })
     const user = userEvent.setup({ delay: null })
     box()
 
-    // 1. the example name that the form opens with
+    // 1. the empty name the form opens with
     await user.type(input(), 'amst')
     await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
     expect(useSession.getState().draft.name).toBe('Amsterdam')
@@ -411,6 +411,37 @@ describe('PlaceSearchBox', () => {
     await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
     expect(useSession.getState().draft.name).toBe('Amsterdam')
     expect(screen.getByRole('status')).toHaveTextContent('Region set to Amsterdam')
+  })
+
+  it('adds the way out to a search error that does not already give it, and not twice to one that does', async () => {
+    const user = userEvent.setup({ delay: null })
+    mockApi({
+      [ROUTE]: () =>
+        apiError(429, 'rate_limited', 'Too many searches. Wait a moment and try again.'),
+    })
+    const first = box()
+    await user.type(input(), 'amsterdam')
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Too many searches. Wait a moment and try again. You can type coordinates or draw an area instead.',
+    )
+    first.unmount()
+
+    mockApi({
+      [ROUTE]: () =>
+        apiError(
+          503,
+          'service_unavailable',
+          'Place search is unavailable right now. Type the coordinates or draw the box instead.',
+        ),
+    })
+    box()
+    await user.type(input(), 'amsterdam')
+
+    const alert = await screen.findByRole('alert')
+    expect(alert).toHaveTextContent(
+      'Place search is unavailable right now. Type the coordinates or draw the box instead.',
+    )
+    expect(alert.textContent.match(/coordinates/gi)).toHaveLength(1)
   })
 
   it('puts focus back in the search box after choosing, so the keyboard user is not lost', async () => {

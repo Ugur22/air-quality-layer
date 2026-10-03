@@ -148,6 +148,9 @@ export function RegionForm({
                       value={values[field]}
                       onChange={(e) => {
                         setDraftField(field, e.target.value)
+                        // The box turns valid part-way through typing a number; the section must
+                        // not close under the user's hands then.
+                        setCustomAreaOpen(true)
                       }}
                       aria-invalid={isInvalid(shownErrors, field)}
                       aria-describedby={describedBy(shownErrors, field)}

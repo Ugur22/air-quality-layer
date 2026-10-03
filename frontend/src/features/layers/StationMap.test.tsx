@@ -334,6 +334,46 @@ describe('StationMap', () => {
     )
   })
 
+  it('opens on the Netherlands when there is neither a layer nor a box', () => {
+    render(
+      <StationMap
+        layer={null}
+        draftBbox={null}
+        property={null}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+      />,
+    )
+
+    const view = JSON.parse(
+      screen.getByTestId('map').getAttribute('data-initial-view') ?? '{}',
+    ) as {
+      bounds: number[]
+    }
+    expect(view.bounds).toEqual([3.3, 50.75, 7.25, 53.55])
+  })
+
+  it('opens on the typed box instead of the Netherlands when there is one', () => {
+    render(
+      <StationMap
+        layer={null}
+        draftBbox={[5, 52, 5.2, 52.15]}
+        property={null}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+      />,
+    )
+
+    const view = JSON.parse(
+      screen.getByTestId('map').getAttribute('data-initial-view') ?? '{}',
+    ) as {
+      bounds: number[]
+    }
+    expect(view.bounds).toEqual([5, 52, 5.2, 52.15])
+  })
+
   it('shows the map before any sync, with the typed box as the outline and no legend', () => {
     render(
       <StationMap
