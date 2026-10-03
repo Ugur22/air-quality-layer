@@ -6,7 +6,15 @@ import type { Bbox } from '@/features/regions/types'
 import { Button } from '@/components/ui/button'
 import { BASEMAP_STYLE_URL } from '@/lib/config'
 import { formatValue } from '@/lib/format'
-import { buildMapData, COLOUR_STOPS, stationCirclePaint, valueRange } from './mapData'
+import {
+  buildMapData,
+  COLOUR_STOPS,
+  NO_VALUE_LABEL,
+  STATION_LABEL_LAYOUT,
+  STATION_LABEL_PAINT,
+  stationCirclePaint,
+  valueRange,
+} from './mapData'
 import { startRectangleDrawing } from './regionDrawing'
 import { StationPopup } from './StationPopup'
 import type { MapLayerResponse } from './types'
@@ -53,7 +61,7 @@ function Legend({
     <div
       role="group"
       aria-label="Map legend"
-      className="absolute bottom-6 left-3 z-10 flex max-h-44 max-w-[min(22rem,calc(100%-1.5rem))] flex-col gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface/95 p-3 text-xs text-muted shadow-md"
+      className="absolute bottom-6 left-3 z-10 flex max-h-52 max-w-[min(17rem,calc(100%-1.5rem))] flex-col gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface/95 p-3 text-xs text-muted shadow-md"
     >
       {property === null || range === null ? (
         <p>{property === null ? 'Nothing to colour by.' : `No station reports ${property}.`}</p>
@@ -63,7 +71,7 @@ function Legend({
           <span className="tabular-nums">{formatValue(range.min)}</span>
           <span
             aria-hidden
-            className="h-2.5 w-32 rounded-full border border-line"
+            className="h-2.5 w-24 rounded-full border border-line"
             style={{ background: `linear-gradient(to right, ${COLOUR_STOPS.join(', ')})` }}
           />
           <span className="tabular-nums">
@@ -72,20 +80,53 @@ function Legend({
           <span>(relative to this layer)</span>
         </div>
       )}
-      {range !== null && range.otherUnitCount > 0 ? (
-        <p>
-          {range.otherUnitCount === 1
-            ? `1 station reports ${String(property)} in another unit and is`
-            : `${String(range.otherUnitCount)} stations report ${String(property)} in another unit and are`}{' '}
-          left off this scale and drawn as a hollow ring; the popup shows the real value.
-        </p>
+      {property !== null ? (
+        <div className="flex flex-col gap-1">
+          <p className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="inline-grid h-5 min-w-9 place-items-center rounded-md bg-accent px-1.5 font-mono text-[11px] text-white"
+            >
+              12.4
+            </span>
+            Latest {property} reading
+          </p>
+          <p className="flex items-center gap-2">
+            <span
+              aria-hidden
+              className="inline-grid h-5 min-w-9 place-items-center rounded-md border border-dashed border-muted bg-surface px-1.5 font-mono text-[11px]"
+            >
+              {NO_VALUE_LABEL}
+            </span>
+            <span>
+              <span className="sr-only">{NO_VALUE_LABEL} </span>No {property} reported
+            </span>
+          </p>
+        </div>
       ) : null}
-      <p>
-        Faded dot: the reading is 24 hours old or older. Hollow ring: no usable value to colour.
-      </p>
-      {showSyncedBox ? (
-        <p>Dashed box: the region in the form. Solid box: the region these stations come from.</p>
-      ) : null}
+      <details className="group">
+        <summary className="cursor-pointer select-none text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
+          What the markers mean
+        </summary>
+        <div className="mt-1.5 flex flex-col gap-1.5">
+          {range !== null && range.otherUnitCount > 0 ? (
+            <p>
+              {range.otherUnitCount === 1
+                ? `1 station reports ${String(property)} in another unit and is`
+                : `${String(range.otherUnitCount)} stations report ${String(property)} in another unit and are`}{' '}
+              left off this scale and drawn as a hollow ring; the popup shows the real value.
+            </p>
+          ) : null}
+          <p>
+            Faded dot: the reading is 24 hours old or older. Hollow ring: no usable value to colour.
+          </p>
+          {showSyncedBox ? (
+            <p>
+              Dashed box: the region in the form. Solid box: the region these stations come from.
+            </p>
+          ) : null}
+        </div>
+      </details>
     </div>
   )
 }
@@ -276,6 +317,12 @@ export function StationMap({
           <Source id="stations" type="geojson" data={data}>
             <Layer id="stations" type="circle" paint={paint} />
             <Layer
+              id="station-values"
+              type="symbol"
+              layout={STATION_LABEL_LAYOUT}
+              paint={STATION_LABEL_PAINT}
+            />
+            <Layer
               id="stations-selected"
               type="circle"
               filter={['==', ['get', 'id'], selectedId ?? '']}
@@ -300,7 +347,7 @@ export function StationMap({
                 onSelect(null)
               }}
             >
-              <StationPopup station={selected} now={now} />
+              <StationPopup station={selected} now={now} property={property} />
             </Popup>
           ) : null}
         </Map>

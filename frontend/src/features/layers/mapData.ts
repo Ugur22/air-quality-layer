@@ -1,4 +1,5 @@
-import type { CircleLayerSpecification } from 'maplibre-gl'
+import type { CircleLayerSpecification, SymbolLayerSpecification } from 'maplibre-gl'
+import { formatValue } from '@/lib/format'
 import { isStale } from '@/lib/freshness'
 import type { StationFeature } from './types'
 
@@ -7,6 +8,8 @@ export interface MapStationProperties {
   name: string
   hasValue: boolean
   value: number | null
+  /** What is written next to the marker: the value, or an en dash when there is none. */
+  label: string
   stale: boolean
 }
 
@@ -26,6 +29,8 @@ export interface ValueRange {
   /** Stations reporting this parameter in a different unit; they are left off the scale. */
   otherUnitCount: number
 }
+
+export const NO_VALUE_LABEL = '–'
 
 /** pm25 is the most commonly reported pollutant; otherwise the first one the layer has. */
 export function pickColourProperty(propertyKeys: string[]): string | null {
@@ -60,6 +65,7 @@ export function buildMapData(
           name: station.properties.name,
           hasValue: reading !== undefined,
           value: reading?.value ?? null,
+          label: reading === undefined ? NO_VALUE_LABEL : formatValue(reading.value),
           stale: reading !== undefined && isStale(reading.observed_at, now),
         },
       }
@@ -115,3 +121,24 @@ export function stationCirclePaint(range: ValueRange | null): CircleLayerSpecifi
     'circle-stroke-opacity': ['case', ['get', 'stale'], 0.45, 1],
   } as CircleLayerSpecification['paint']
 }
+
+/**
+ * The number beside each marker. It sits to the right instead of inside, because a circle small
+ * enough to be a marker cannot hold a value like 316. Where labels collide the highest value
+ * is kept, and the marker itself is never hidden.
+ */
+export const STATION_LABEL_LAYOUT = {
+  'text-field': ['get', 'label'],
+  'text-font': ['Noto Sans Bold'],
+  'text-size': 12,
+  'text-anchor': 'left',
+  'text-offset': [1.3, 0],
+  'symbol-sort-key': ['*', -1, ['coalesce', ['get', 'value'], 0]],
+} as SymbolLayerSpecification['layout']
+
+export const STATION_LABEL_PAINT = {
+  'text-color': '#12201f',
+  'text-halo-color': '#ffffff',
+  'text-halo-width': 2,
+  'text-opacity': ['case', ['get', 'stale'], 0.45, 1],
+} as SymbolLayerSpecification['paint']

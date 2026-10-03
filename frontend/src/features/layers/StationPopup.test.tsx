@@ -21,6 +21,20 @@ describe('StationPopup', () => {
     expect(pm25).toHaveTextContent('2 h ago')
   })
 
+  it('marks the row of the chosen property', () => {
+    render(<StationPopup station={first} now={now} property="pm25" />)
+
+    const rows = screen.getAllByRole('row').slice(1)
+    expect(rows.find((r) => within(r).queryByText('pm25'))).toHaveAttribute('aria-current', 'true')
+    expect(rows.find((r) => within(r).queryByText('no2'))).not.toHaveAttribute('aria-current')
+  })
+
+  it('marks no row when no property is chosen', () => {
+    render(<StationPopup station={first} now={now} />)
+
+    expect(document.querySelector('[aria-current]')).toBeNull()
+  })
+
   it('marks each stale reading individually', () => {
     const mixed = {
       ...first,

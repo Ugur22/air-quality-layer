@@ -62,9 +62,28 @@ describe('StationList', () => {
     )
 
     const rows = screen.getAllByRole('listitem')
-    expect(within(rows[0] as HTMLElement).queryByText(/µg/)).not.toBeInTheDocument()
-    expect(within(rows[1] as HTMLElement).getByText('p0:')).toBeInTheDocument()
-    expect(within(rows[1] as HTMLElement).getByText('x')).toBeInTheDocument()
+    expect(within(rows[0] as HTMLElement).getByText('p0:')).toBeInTheDocument()
+    expect(within(rows[0] as HTMLElement).getByText('x')).toBeInTheDocument()
+    expect(within(rows[1] as HTMLElement).queryByText(/µg/)).not.toBeInTheDocument()
+  })
+
+  it('lists the highest value of the chosen property first and stations without it last', () => {
+    const none = { ...first, id: 'none', properties: { name: 'No reading', readings: {} } }
+    render(
+      <StationList
+        stations={[none, first, second]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        property="pm25"
+      />,
+    )
+
+    const names = screen.getAllByRole('listitem').map((li) => li.textContent)
+    expect(names[0]).toContain('Amsterdam City Center')
+    expect(names[1]).toContain('Amsterdam-Van Diemenstraat')
+    expect(names[2]).toContain('No reading')
+    expect(names[2]).toContain('no pm25')
   })
 
   it('says so when there are no stations', () => {

@@ -26,8 +26,22 @@ describe('buildMapData', () => {
     const data = buildMapData(stations, 'pm25', now)
 
     expect(data.features.map((f) => f.properties)).toEqual([
-      { id: 'f-1', name: 'Amsterdam-Van Diemenstraat', hasValue: true, value: 7.6, stale: false },
-      { id: 'f-2', name: 'Amsterdam City Center', hasValue: true, value: 36.4, stale: true },
+      {
+        id: 'f-1',
+        name: 'Amsterdam-Van Diemenstraat',
+        hasValue: true,
+        value: 7.6,
+        label: '7.6',
+        stale: false,
+      },
+      {
+        id: 'f-2',
+        name: 'Amsterdam City Center',
+        hasValue: true,
+        value: 36.4,
+        label: '36.4',
+        stale: true,
+      },
     ])
   })
 
@@ -67,6 +81,22 @@ describe('buildMapData', () => {
     expect(buildMapData(stations, null, now).features.every((f) => !f.properties.hasValue)).toBe(
       true,
     )
+  })
+})
+
+describe('buildMapData labels', () => {
+  it('labels a station with its value, trimmed of float noise', () => {
+    const noisy = structuredClone(stations)
+    const reading = noisy[0]?.properties.readings.pm25
+    if (reading) reading.value = 36.44749984741211
+
+    expect(buildMapData(noisy, 'pm25', now).features[0]?.properties.label).toBe('36.45')
+  })
+
+  it('labels a station without a usable value with an en dash', () => {
+    const data = buildMapData(stations, 'no2', now)
+
+    expect(data.features[1]?.properties.label).toBe('–')
   })
 })
 

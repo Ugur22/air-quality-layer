@@ -52,12 +52,30 @@ export function Map({
   )
 }
 
-export function Source({ id, data }: { id: string; data: unknown; children?: ReactNode }) {
-  return <div data-testid={`source-${id}`} data-geojson={JSON.stringify(data)} />
+export function Source({
+  id,
+  data,
+  children,
+}: {
+  id: string
+  data: unknown
+  children?: ReactNode
+}) {
+  return (
+    <div data-testid={`source-${id}`} data-geojson={JSON.stringify(data)}>
+      {children}
+    </div>
+  )
 }
 
-export function Layer({ id, paint }: { id: string; paint?: unknown }) {
-  return <div data-testid={`layer-${id}`} data-paint={JSON.stringify(paint ?? {})} />
+export function Layer({ id, paint, layout }: { id: string; paint?: unknown; layout?: unknown }) {
+  return (
+    <div
+      data-testid={`layer-${id}`}
+      data-paint={JSON.stringify(paint ?? {})}
+      data-layout={JSON.stringify(layout ?? {})}
+    />
+  )
 }
 
 export function Popup({

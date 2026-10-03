@@ -2,7 +2,16 @@ import { formatAge, isStale } from '@/lib/freshness'
 import { formatValue } from '@/lib/format'
 import type { StationFeature } from './types'
 
-export function StationPopup({ station, now }: { station: StationFeature; now: Date }) {
+export function StationPopup({
+  station,
+  now,
+  property = null,
+}: {
+  station: StationFeature
+  now: Date
+  /** The reading the map is coloured by; its row is marked. */
+  property?: string | null
+}) {
   const readings = Object.entries(station.properties.readings).sort(([a], [b]) =>
     a.localeCompare(b),
   )
@@ -22,8 +31,14 @@ export function StationPopup({ station, now }: { station: StationFeature; now: D
           </thead>
           <tbody>
             {readings.map(([name, reading]) => (
-              <tr key={name} className="border-t border-line align-baseline">
-                <td className="py-1 pr-3 font-mono text-xs">{name}</td>
+              <tr
+                key={name}
+                aria-current={name === property ? 'true' : undefined}
+                className="border-t border-line align-baseline aria-[current=true]:bg-accent-soft aria-[current=true]:font-semibold"
+              >
+                <td className="py-1 pl-1.5 pr-3 font-mono text-xs aria-[current=true]:shadow-none">
+                  {name}
+                </td>
                 <td className="py-1 pr-3 tabular-nums">
                   {formatValue(reading.value)} {reading.unit}
                 </td>

@@ -137,9 +137,10 @@ describe('App', () => {
     expect(calls.some((c) => c.path === '/api/v1/regions/r-1/syncs')).toBe(true)
     const stations = await screen.findAllByRole('listitem')
     expect(stations).toHaveLength(2)
-    expect(within(stations[0] as HTMLElement).getByText('Amsterdam-Van Diemenstraat')).toBeVisible()
-    expect(within(stations[0] as HTMLElement).queryByText('stale')).not.toBeInTheDocument()
-    expect(within(stations[1] as HTMLElement).getByText('stale')).toBeVisible()
+    // Highest pm25 first: the stale station has the higher value.
+    expect(within(stations[0] as HTMLElement).getByText('stale')).toBeVisible()
+    expect(within(stations[1] as HTMLElement).getByText('Amsterdam-Van Diemenstraat')).toBeVisible()
+    expect(within(stations[1] as HTMLElement).queryByText('stale')).not.toBeInTheDocument()
   })
 
   it('keeps the submit button disabled while a sync is in flight', async () => {

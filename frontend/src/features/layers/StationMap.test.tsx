@@ -40,6 +40,42 @@ describe('StationMap', () => {
     expect(stationsSource().features.map((f) => f.properties.value)).toEqual([7.6, 36.4])
   })
 
+  it("writes each station's value next to its marker, from the label in the source", () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const layout = JSON.parse(
+      screen.getByTestId('layer-station-values').getAttribute('data-layout') ?? '{}',
+    ) as Record<string, unknown>
+    expect(layout['text-field']).toEqual(['get', 'label'])
+    expect(stationsSource().features.map((f) => f.properties.label)).toEqual(['7.6', '36.4'])
+  })
+
+  it('explains the marker and the stations without a reading in the legend', () => {
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const legend = screen.getByRole('group', { name: /legend/i })
+    expect(legend).toHaveTextContent(/latest pm25 reading/i)
+    expect(legend).toHaveTextContent(/–.*no pm25 reported/i)
+  })
+
   it('draws the outline of the box in the form', () => {
     render(
       <StationMap

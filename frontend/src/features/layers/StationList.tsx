@@ -28,9 +28,16 @@ export function StationList({
   if (stations.length === 0) {
     return <p className="px-4 py-3 text-sm text-muted">{emptyMessage}</p>
   }
+  // Highest first, so the stations worth a look are on top; those without the reading go last.
+  const valueOf = (station: StationFeature) =>
+    property === null ? undefined : station.properties.readings[property]?.value
+  const ordered =
+    property === null
+      ? stations
+      : [...stations].sort((a, b) => (valueOf(b) ?? -Infinity) - (valueOf(a) ?? -Infinity))
   return (
     <ul className="divide-y divide-line">
-      {stations.map((station) => {
+      {ordered.map((station) => {
         const newest = newestObservation(station)
         const stale = newest !== null && isStale(newest, now)
         const reading = property === null ? undefined : station.properties.readings[property]
@@ -59,11 +66,13 @@ export function StationList({
                   </span>
                 ) : null}
                 {reading ? (
-                  <span className="font-mono text-sm tabular-nums">
+                  <span className="font-mono text-base font-semibold tabular-nums">
                     <span className="sr-only">{property}: </span>
                     {formatValue(reading.value)}{' '}
-                    <span className="text-xs text-muted">{reading.unit}</span>
+                    <span className="text-xs font-normal text-muted">{reading.unit}</span>
                   </span>
+                ) : property !== null ? (
+                  <span className="text-xs italic text-muted">no {property}</span>
                 ) : null}
               </span>
             </button>
