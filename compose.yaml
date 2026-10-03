@@ -1,0 +1,51 @@
+# Local development only. Credentials below are throwaway dev values, not secrets.
+x-backend: &backend
+  build: ./backend
+  environment:
+    AIRLAYER_ENVIRONMENT: development
+    AIRLAYER_DATABASE_URL: postgresql://airlayer:airlayer@db:5432/airlayer
+    AIRLAYER_OPENAQ_API_KEY: ${OPENAQ_API_KEY:-}
+  volumes:
+    - ./backend/src:/app/src
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  db:
+    # Community multi-arch build: the official postgis/postgis image has no arm64 manifest.
+    image: imresamu/postgis:17-3.5-bookworm
+    environment:
+      POSTGRES_USER: airlayer
+      POSTGRES_PASSWORD: airlayer
+      POSTGRES_DB: airlayer
+    ports:
+      - "127.0.0.1:5434:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U airlayer -d airlayer"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    <<: *backend
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python -m airlayer.migrate
+    restart: "no"
+
+  api:
+    <<: *backend
+    command: uvicorn airlayer.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "127.0.0.1:8001:8000"
+
+  worker:
+    <<: *backend
+    command: procrastinate --app=airlayer.jobs.app worker
+
+volumes:
+  pgdata:
