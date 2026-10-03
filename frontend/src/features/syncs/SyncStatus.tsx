@@ -6,7 +6,7 @@ import type { SyncJob } from './types'
 
 function Progress({ title, detail }: { title: string; detail: string }) {
   return (
-    <div role="status" className="flex items-start gap-3 text-sm">
+    <div role="status" className="flex items-start gap-3 rounded-lg bg-accent-soft p-3 text-sm">
       <LoaderCircle className="mt-0.5 size-4 shrink-0 animate-spin text-accent" aria-hidden />
       <div>
         <p className="font-medium">{title}</p>
@@ -34,7 +34,7 @@ export function SyncStatus({ job }: { job: SyncJob }) {
     .with('succeeded', () => {
       const count = job.station_count ?? 0
       return (
-        <div role="status" className="flex items-start gap-3 text-sm">
+        <div role="status" className="flex items-start gap-3 rounded-lg bg-accent-soft p-3 text-sm">
           <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-good" aria-hidden />
           <div>
             <p className="font-medium">
@@ -43,7 +43,7 @@ export function SyncStatus({ job }: { job: SyncJob }) {
             <p className="text-muted">
               {count === 0
                 ? 'The sync worked, but OpenAQ has no monitoring stations here.'
-                : 'The latest readings are stored and shown on the right.'}
+                : 'The latest readings are stored and shown on the map.'}
             </p>
           </div>
         </div>

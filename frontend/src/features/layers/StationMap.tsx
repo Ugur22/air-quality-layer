@@ -11,7 +11,8 @@ import { startRectangleDrawing } from './regionDrawing'
 import { StationPopup } from './StationPopup'
 import type { MapLayerResponse } from './types'
 
-const FIT_PADDING = 48
+// The legend floats over the bottom-left corner, so a fitted region leaves room under it.
+const FIT_PADDING_BOX = { top: 48, right: 48, bottom: 120, left: 48 }
 // Roughly the Netherlands, for when there is neither a layer nor a usable box to look at.
 const DEFAULT_VIEW = { longitude: 5.3, latitude: 52.2, zoom: 6 }
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
@@ -49,7 +50,11 @@ function Legend({
   showSyncedBox: boolean
 }) {
   return (
-    <div role="group" aria-label="Map legend" className="flex flex-col gap-1.5 text-xs text-muted">
+    <div
+      role="group"
+      aria-label="Map legend"
+      className="absolute bottom-6 left-3 z-10 flex max-h-44 max-w-[min(22rem,calc(100%-1.5rem))] flex-col gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface/95 p-3 text-xs text-muted shadow-md"
+    >
       {property === null || range === null ? (
         <p>{property === null ? 'Nothing to colour by.' : `No station reports ${property}.`}</p>
       ) : (
@@ -148,7 +153,7 @@ export function StationMap({
   useEffect(() => {
     const map = mapRef.current
     if (layerId === null || layerId === fittedFor.current || !map || !layerBbox) return
-    map.fitBounds(layerBbox, { padding: FIT_PADDING, duration: 0 })
+    map.fitBounds(layerBbox, { padding: FIT_PADDING_BOX, duration: 0 })
     fittedFor.current = layerId
   }, [layerId, layerBbox])
 
@@ -158,7 +163,7 @@ export function StationMap({
   useEffect(() => {
     const map = mapRef.current
     if (!viewRequest || viewRequest.id === lastViewId.current || !map) return
-    map.fitBounds(viewRequest.bbox, { padding: FIT_PADDING, duration: 600 })
+    map.fitBounds(viewRequest.bbox, { padding: FIT_PADDING_BOX, duration: 600 })
     lastViewId.current = viewRequest.id
   }, [viewRequest])
 
@@ -187,8 +192,8 @@ export function StationMap({
 
   const startBbox = layerBbox ?? draftBbox
   return (
-    <div className="flex flex-col gap-3">
-      <div className="relative h-[26rem] overflow-hidden rounded-md border border-line bg-surface">
+    <div className="relative h-full overflow-hidden bg-surface">
+      <div className="absolute inset-0">
         {onBoxDrawn ? (
           // Only the button takes pointer events: the rest of this overlay must not block a drag that
           // starts in the corner of the map.
@@ -228,7 +233,7 @@ export function StationMap({
           mapStyle={BASEMAP_STYLE_URL}
           initialViewState={
             startBbox
-              ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING } }
+              ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING_BOX } }
               : DEFAULT_VIEW
           }
           interactiveLayerIds={['stations']}

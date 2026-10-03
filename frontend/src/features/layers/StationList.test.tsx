@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { layer } from '@/test/fixtures'
 import type { StationFeature } from './types'
@@ -47,6 +47,24 @@ describe('StationList', () => {
 
     expect(screen.queryByText('stale')).not.toBeInTheDocument()
     expect(screen.getByText(/latest 17 h ago/)).toBeInTheDocument()
+  })
+
+  it("shows the chosen property's value and unit, and nothing for a station without it", () => {
+    const only = withTimes(['2026-10-03T09:00:00Z'])
+    render(
+      <StationList
+        stations={[first, only]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        property="p0"
+      />,
+    )
+
+    const rows = screen.getAllByRole('listitem')
+    expect(within(rows[0] as HTMLElement).queryByText(/µg/)).not.toBeInTheDocument()
+    expect(within(rows[1] as HTMLElement).getByText('p0:')).toBeInTheDocument()
+    expect(within(rows[1] as HTMLElement).getByText('x')).toBeInTheDocument()
   })
 
   it('says so when there are no stations', () => {

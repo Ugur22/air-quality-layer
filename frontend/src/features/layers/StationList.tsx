@@ -1,4 +1,5 @@
 import { formatAge, isStale } from '@/lib/freshness'
+import { formatValue } from '@/lib/format'
 import type { StationFeature } from './types'
 
 function newestObservation(station: StationFeature): string | null {
@@ -13,22 +14,26 @@ export function StationList({
   selectedId,
   onSelect,
   now,
+  property = null,
   emptyMessage = 'No stations to show.',
 }: {
   stations: StationFeature[]
   selectedId: string | null
   onSelect: (id: string) => void
   now: Date
+  /** The reading shown at the right of each row: the one the map is coloured by. */
+  property?: string | null
   emptyMessage?: string
 }) {
   if (stations.length === 0) {
-    return <p className="text-sm text-muted">{emptyMessage}</p>
+    return <p className="px-4 py-3 text-sm text-muted">{emptyMessage}</p>
   }
   return (
-    <ul className="divide-y divide-line rounded-md border border-line bg-surface">
+    <ul className="divide-y divide-line">
       {stations.map((station) => {
         const newest = newestObservation(station)
         const stale = newest !== null && isStale(newest, now)
+        const reading = property === null ? undefined : station.properties.readings[property]
         const readingCount = Object.keys(station.properties.readings).length
         return (
           <li key={station.id}>
@@ -38,7 +43,7 @@ export function StationList({
               onClick={() => {
                 onSelect(station.id)
               }}
-              className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-3 text-left hover:bg-accent-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-pressed:bg-accent-soft"
+              className="flex w-full flex-wrap items-center justify-between gap-2 px-4 py-2.5 text-left hover:bg-accent-soft focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-accent aria-pressed:bg-accent-soft"
             >
               <span>
                 <span className="block font-medium">{station.properties.name}</span>
@@ -47,11 +52,20 @@ export function StationList({
                   {newest ? `, latest ${formatAge(newest, now)}` : ''}
                 </span>
               </span>
-              {stale ? (
-                <span className="rounded-full border border-warn/50 px-2 py-0.5 font-mono text-xs text-warn">
-                  stale
-                </span>
-              ) : null}
+              <span className="flex items-center gap-3">
+                {stale ? (
+                  <span className="rounded-full border border-warn/50 px-2 py-0.5 font-mono text-xs text-warn">
+                    stale
+                  </span>
+                ) : null}
+                {reading ? (
+                  <span className="font-mono text-sm tabular-nums">
+                    <span className="sr-only">{property}: </span>
+                    {formatValue(reading.value)}{' '}
+                    <span className="text-xs text-muted">{reading.unit}</span>
+                  </span>
+                ) : null}
+              </span>
             </button>
           </li>
         )

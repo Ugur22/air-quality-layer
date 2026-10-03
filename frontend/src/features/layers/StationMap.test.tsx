@@ -365,7 +365,10 @@ describe('StationMap', () => {
     expect(mapSpies.fitBounds).toHaveBeenCalledTimes(1)
     expect(mapSpies.fitBounds).toHaveBeenCalledWith(
       [4.85, 52.35, 4.95, 52.4],
-      expect.objectContaining({ padding: 48, duration: 0 }),
+      expect.objectContaining({
+        padding: { top: 48, right: 48, bottom: 120, left: 48 },
+        duration: 0,
+      }),
     )
   })
 
@@ -583,7 +586,7 @@ describe('StationMap view requests', () => {
     expect(mapSpies.fitBounds).toHaveBeenCalledTimes(1)
     expect(mapSpies.fitBounds).toHaveBeenCalledWith(
       [4.7, 52.2, 5.1, 52.4],
-      expect.objectContaining({ padding: 48 }),
+      expect.objectContaining({ padding: { top: 48, right: 48, bottom: 120, left: 48 } }),
     )
 
     rerender(<StationMap {...props} viewRequest={{ bbox: [4.7, 52.2, 5.1, 52.4], id: 2 }} />)

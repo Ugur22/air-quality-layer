@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import type { Bbox } from '@/features/regions/types'
@@ -19,7 +19,18 @@ export function ResultPanel({
   layer,
   now,
   idle,
+  rail = null,
+  title = 'Stations',
+  loading = false,
+  error = null,
 }: {
+  /** Shown at the top of the left rail, above the filter. */
+  rail?: ReactNode
+  /** Heading of the station list, normally the region's name. */
+  title?: string
+  loading?: boolean
+  /** Why the layer could not be loaded, already worded for the user. */
+  error?: string | null
   layer: MapLayerResponse | null
   /** When the layer was fetched: one clock for the map, the popup and the list. */
   now: Date
@@ -97,75 +108,119 @@ export function ResultPanel({
   const selectedId = stations.some((s) => s.id === selectedStationId) ? selectedStationId : null
 
   return (
-    <div className="flex flex-col gap-4">
-      {layer && property !== null ? (
-        <div className="flex flex-col gap-4">
-          <div className="flex max-w-xs flex-col gap-1.5">
-            <Label htmlFor="colour-property">Pollutant</Label>
-            <select
-              id="colour-property"
-              value={property}
-              onChange={(e) => {
-                setColourProperty(e.target.value)
-              }}
-              className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
-            >
-              {keys.map((key) => (
-                <option key={key} value={key}>
-                  {key}
-                </option>
-              ))}
-            </select>
-          </div>
-          <LayerFilterControls property={property} parsed={settled} />
-          {/* One status element stays mounted so screen readers announce its changes. */}
-          <p role="status" className="text-sm">
-            {filtered.isError
-              ? null
-              : updating
-                ? 'Updating…'
-                : filter && visibleIds
-                  ? stations.length === 0
-                    ? 'No stations match this filter.'
-                    : `Showing ${String(stations.length)} of ${String(allStations.length)} stations.`
-                  : null}
-          </p>
-          {filtered.isError ? (
-            <Alert variant="destructive">
-              <AlertDescription>{describeError(filtered.error)}</AlertDescription>
-            </Alert>
-          ) : null}
-        </div>
-      ) : null}
-      <section aria-label="Map" aria-describedby="map-hint" className="flex flex-col gap-3">
-        <StationMap
-          layer={layer}
-          visibleIds={visibleIds}
-          draftBbox={box}
-          property={property}
-          selectedId={selectedId}
-          onSelect={selectStation}
-          now={now}
-          onBoxDrawn={writeBox}
-          viewRequest={viewRequest}
-        />
-        <p id="map-hint" className="text-sm text-muted">
+    <div className="grid h-full lg:grid-cols-[22.5rem_minmax(0,1fr)]">
+      <div className="flex min-h-0 min-w-0 flex-col">
+        <section
+          aria-label="Map"
+          aria-describedby="map-hint"
+          className="relative h-[26rem] lg:h-auto lg:min-h-64 lg:flex-1"
+        >
+          <StationMap
+            layer={layer}
+            visibleIds={visibleIds}
+            draftBbox={box}
+            property={property}
+            selectedId={selectedId}
+            onSelect={selectStation}
+            now={now}
+            onBoxDrawn={writeBox}
+            viewRequest={viewRequest}
+          />
+        </section>
+        <p
+          id="map-hint"
+          className="border-t border-line bg-surface px-4 py-2 text-sm text-muted empty:hidden"
+        >
           {box === null
             ? `This box cannot be used${problem ? `: ${problem}` : '.'} Draw a new one or fix the numbers.`
             : layer === null && idle
               ? 'The dashed box is the region you are about to sync. Press “Create region and sync” to load the stations OpenAQ has inside it.'
               : null}
         </p>
+        {loading ? (
+          <p role="status" className="border-t border-line bg-surface px-4 py-2 text-sm text-muted">
+            Loading stations…
+          </p>
+        ) : null}
+        {error !== null ? (
+          <div className="border-t border-line bg-surface px-4 py-2">
+            <Alert variant="destructive">
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          </div>
+        ) : null}
+        {layer ? (
+          <section
+            aria-label="Station list"
+            className="flex max-h-60 min-h-0 flex-col border-t border-line bg-surface"
+          >
+            <div className="flex items-baseline justify-between gap-3 border-b border-line px-4 py-2.5">
+              <h2 className="font-display text-[15px] font-bold">{title}</h2>
+              <span className="font-mono text-[11px] uppercase tracking-[0.08em] text-muted">
+                {stations.length === 1 ? '1 station' : `${String(stations.length)} stations`}
+              </span>
+            </div>
+            <div className="min-h-0 overflow-y-auto">
+              <StationList
+                stations={stations}
+                selectedId={selectedId}
+                onSelect={selectStation}
+                now={now}
+                property={property}
+                emptyMessage={visibleIds ? 'No stations match this filter.' : undefined}
+              />
+            </div>
+          </section>
+        ) : null}
+      </div>
+      <section
+        aria-label="Region and filter"
+        className="flex flex-col gap-5 border-t border-line bg-surface p-4 lg:order-first lg:overflow-y-auto lg:border-r lg:border-t-0"
+      >
+        {rail}
+        {layer && property !== null ? (
+          <section aria-label="Filter" className="flex flex-col gap-3 border-t border-line pt-5">
+            <p className="font-mono text-[11px] font-medium uppercase tracking-[0.08em] text-muted">
+              Filter
+            </p>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="colour-property">Pollutant</Label>
+              <select
+                id="colour-property"
+                value={property}
+                onChange={(e) => {
+                  setColourProperty(e.target.value)
+                }}
+                className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+              >
+                {keys.map((key) => (
+                  <option key={key} value={key}>
+                    {key}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <LayerFilterControls property={property} parsed={settled} />
+            {/* One status element stays mounted so screen readers announce its changes. */}
+            <p role="status" className="text-sm">
+              {filtered.isError
+                ? null
+                : updating
+                  ? 'Updating…'
+                  : filter && visibleIds
+                    ? stations.length === 0
+                      ? 'No stations match this filter.'
+                      : `Showing ${String(stations.length)} of ${String(allStations.length)} stations.`
+                    : null}
+            </p>
+            {filtered.isError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{describeError(filtered.error)}</AlertDescription>
+              </Alert>
+            ) : null}
+          </section>
+        ) : null}
       </section>
-      {layer ? (
-        <StationList
-          stations={stations}
-          selectedId={selectedId}
-          onSelect={selectStation}
-          now={now}
-          emptyMessage={visibleIds ? 'No stations match this filter.' : undefined}
-        />
-      ) : null}
     </div>
   )
 }
