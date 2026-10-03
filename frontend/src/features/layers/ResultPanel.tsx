@@ -2,7 +2,7 @@ import { useCallback, useMemo, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import type { Bbox } from '@/features/regions/types'
-import { boxProblem, draftBbox } from '@/features/regions/validation'
+import { boxProblem, draftBbox, DRAWN_AREA_NAME, isBoxEmpty } from '@/features/regions/validation'
 import { describeError } from '@/features/syncs/messages'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useSession } from '@/stores/session'
@@ -44,6 +44,7 @@ export function ResultPanel({
   const selectedStationId = useSession((s) => s.selectedStationId)
   const selectStation = useSession((s) => s.selectStation)
   const setDraftField = useSession((s) => s.setDraftField)
+  const setCustomAreaOpen = useSession((s) => s.setCustomAreaOpen)
   const viewRequest = useSession((s) => s.viewRequest)
   const comparator = useSession((s) => s.filterComparator)
   const filterValue = useSession((s) => s.filterValue)
@@ -58,8 +59,12 @@ export function ResultPanel({
       setDraftField('minLat', String(minLat))
       setDraftField('maxLon', String(maxLon))
       setDraftField('maxLat', String(maxLat))
+      // A drawn area has no name yet, and the region needs one; the numbers are shown so they can
+      // be adjusted.
+      if (useSession.getState().draft.name.trim() === '') setDraftField('name', DRAWN_AREA_NAME)
+      setCustomAreaOpen(true)
     },
-    [setDraftField],
+    [setDraftField, setCustomAreaOpen],
   )
   const keys = layer?.map_layer.property_keys ?? []
   // A remembered choice only counts while this layer still has that property.
@@ -133,11 +138,15 @@ export function ResultPanel({
           id="map-hint"
           className="border-t border-line bg-surface px-4 py-2 text-sm text-muted empty:hidden"
         >
-          {box === null
-            ? `This box cannot be used${problem ? `: ${problem}` : '.'} Draw a new one or fix the numbers.`
-            : layer === null && idle
-              ? 'The dashed box is the region you are about to sync. Press “Create region and sync” to load the stations OpenAQ has inside it.'
-              : null}
+          {isBoxEmpty(draft)
+            ? layer === null && idle
+              ? 'Search for a place, or choose “Draw region” and drag on the map, to pick the area to load.'
+              : null
+            : box === null
+              ? `This box cannot be used${problem ? `: ${problem}` : '.'} Draw a new one or fix the numbers.`
+              : layer === null && idle
+                ? 'The dashed box is the region you are about to sync. Press “Create region and sync” to load the stations OpenAQ has inside it.'
+                : null}
         </p>
         {loading ? (
           <p role="status" className="border-t border-line bg-surface px-4 py-2 text-sm text-muted">

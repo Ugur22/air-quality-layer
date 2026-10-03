@@ -92,13 +92,21 @@ export function validateRegionForm(values: RegionFormValues): ValidationResult {
   return { ok: true, value: { name, bbox: box.bbox } }
 }
 
-/** An example region (central Amsterdam) so the form, and the map behind it, open in a working state. */
-export const EXAMPLE_REGION: RegionFormValues = {
-  name: 'Amsterdam centre',
-  minLon: '4.85',
-  minLat: '52.35',
-  maxLon: '4.95',
-  maxLat: '52.40',
+/** The name given to an area drawn on the map when the region has none yet. */
+export const DRAWN_AREA_NAME = 'Custom area'
+
+/** The form before anything is chosen: no area, so no box on the map and nothing to sync. */
+export const EMPTY_DRAFT: RegionFormValues = {
+  name: '',
+  minLon: '',
+  minLat: '',
+  maxLon: '',
+  maxLat: '',
+}
+
+/** Nothing typed, drawn or chosen for the area yet (as opposed to a box that is wrong). */
+export function isBoxEmpty(values: RegionFormValues): boolean {
+  return [values.minLon, values.minLat, values.maxLon, values.maxLat].every((v) => v.trim() === '')
 }
 
 /** The box typed so far, if it is already a valid one; used to preview it on the map. */

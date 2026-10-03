@@ -53,6 +53,9 @@ test('choosing a place fills the form and moves the map there', async ({ page })
   await page.getByRole('option', { name: /utrecht/i }).click()
 
   await expect(page.getByLabel('Name')).toHaveValue('Utrecht')
+  // The numbers stay under "Custom area"; the box on the map shows the chosen area.
+  await expect(page.getByLabel(/^West/)).toHaveCount(0)
+  await page.getByRole('button', { name: 'Custom area' }).click()
   await expect(page.getByLabel(/^West/)).toHaveValue('4.9704')
   await expect(page.getByLabel(/^North/)).toHaveValue('52.1427')
   await expect(page.getByRole('option')).toHaveCount(0)
@@ -69,7 +72,7 @@ test('a place that is too large is shown but cannot be chosen', async ({ page })
   await expect(option).toContainText(/too large/i)
   await option.click({ force: true })
 
-  await expect(page.getByLabel('Name')).toHaveValue('Amsterdam centre')
+  await expect(page.getByLabel('Name')).toHaveValue('')
 })
 
 test('works from the keyboard', async ({ page }) => {

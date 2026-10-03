@@ -1,10 +1,11 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { layer, layer as baseLayer } from '@/test/fixtures'
+import { amsterdamDraft, layer, layer as baseLayer } from '@/test/fixtures'
 import { layerServer } from '@/test/layerServer'
 import { apiError, mockApi } from '@/test/mockApi'
 import { renderWithClient } from '@/test/renderWithClient'
+import { EMPTY_DRAFT } from '@/features/regions/validation'
 import { useSession } from '@/stores/session'
 import { startRectangleDrawing } from './regionDrawing'
 import { ResultPanel } from './ResultPanel'
@@ -29,6 +30,7 @@ function mapStations(): { name: string; value: number | null }[] {
 
 beforeEach(() => {
   useSession.getState().reset()
+  useSession.setState({ draft: amsterdamDraft })
 })
 
 afterEach(() => {
@@ -36,6 +38,16 @@ afterEach(() => {
 })
 
 describe('ResultPanel', () => {
+  it('asks for an area, without a box or a complaint, while none has been chosen', () => {
+    mockApi({})
+    useSession.setState({ draft: EMPTY_DRAFT })
+
+    panel(false)
+
+    expect(screen.getByText(/search for a place, or choose “draw region”/i)).toBeInTheDocument()
+    expect(screen.queryByText(/this box cannot be used/i)).not.toBeInTheDocument()
+  })
+
   it('ignores a remembered station that is not in this layer', () => {
     mockApi({})
     useSession.getState().selectStation('station-from-an-earlier-sync')

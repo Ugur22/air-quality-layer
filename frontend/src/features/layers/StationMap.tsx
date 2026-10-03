@@ -19,12 +19,13 @@ import { startRectangleDrawing } from './regionDrawing'
 import { StationTooltip } from './StationTooltip'
 import type { MapLayerResponse } from './types'
 
-// The legend floats over the bottom-left corner, so a fitted region leaves room under it.
 // Room a tooltip needs next to the pointer before it would run off the map.
 const TOOLTIP_ROOM = { width: 260, height: 100 }
+// The legend floats over the bottom-left corner, so a fitted region leaves room under it.
 const FIT_PADDING_BOX = { top: 48, right: 48, bottom: 120, left: 48 }
-// Roughly the Netherlands, for when there is neither a layer nor a usable box to look at.
-const DEFAULT_VIEW = { longitude: 5.3, latitude: 52.2, zoom: 6 }
+// The Netherlands, west/south/east/north: where the map opens when there is neither a layer nor a
+// box to look at. Nothing stops the user from going elsewhere (a place search moves the camera).
+const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
 
 function sameBox(a: Bbox, b: Bbox | null): boolean {
@@ -284,7 +285,7 @@ export function StationMap({
           initialViewState={
             startBbox
               ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING_BOX } }
-              : DEFAULT_VIEW
+              : { bounds: NETHERLANDS_BOUNDS, fitBoundsOptions: { padding: 16 } }
           }
           interactiveLayerIds={['stations']}
           cursor={pointer ? 'pointer' : undefined}

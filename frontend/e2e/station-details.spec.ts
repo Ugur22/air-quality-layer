@@ -98,6 +98,13 @@ test.afterEach(({ page }) => {
 
 async function openDialog(page: Page, station: string) {
   await page.goto('/')
+  // The app opens with no area, so one is typed under "Custom area".
+  await page.getByRole('button', { name: 'Custom area' }).click()
+  await page.getByLabel('Name').fill('Amsterdam centre')
+  await page.getByLabel(/^West/).fill('4.85')
+  await page.getByLabel(/^South/).fill('52.35')
+  await page.getByLabel(/^East/).fill('4.95')
+  await page.getByLabel(/^North/).fill('52.4')
   await page.getByRole('button', { name: /create region and sync/i }).click()
   await page.getByRole('button', { name: new RegExp(station) }).click()
   return page.getByRole('dialog', { name: station })

@@ -31,7 +31,10 @@ async function mapBox(page: Page) {
   return box
 }
 
+/** The four coordinates; they sit under "Custom area", which this opens if it is closed. */
 async function fields(page: Page) {
+  const toggle = page.getByRole('button', { name: 'Custom area' })
+  if ((await toggle.getAttribute('aria-expanded')) === 'false') await toggle.click()
   return [
     await page.getByLabel(/^West/).inputValue(),
     await page.getByLabel(/^South/).inputValue(),
@@ -80,10 +83,15 @@ async function mapPans(page: Page): Promise<boolean> {
   return before !== (await picture(page))
 }
 
-test('the map is on screen before any sync, with the box from the form', async ({ page }) => {
+test('the map opens with no box and asks for an area', async ({ page }) => {
   await expect(page.locator(MAP)).toBeVisible()
-  await expect(page.getByLabel(/^West/)).toHaveValue('4.85')
-  await expect(page.locator('#map-hint')).toContainText('dashed box')
+  await expect(page.locator('#map-hint')).toContainText('Search for a place')
+  await expect(page.getByRole('button', { name: /create region and sync/i })).toBeDisabled()
+  await expect(page.getByRole('button', { name: 'Custom area' })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await expect(page.getByLabel(/^West/)).toHaveCount(0)
 })
 
 test('a dragged rectangle fills the form, drawing turns off and the map still pans', async ({
@@ -104,6 +112,8 @@ test('a dragged rectangle fills the form, drawing turns off and the map still pa
     'false',
   )
   expect(await fields(page)).not.toEqual(before)
+  await expect(page.getByRole('button', { name: /create region and sync/i })).toBeEnabled()
+  await expect(page.getByLabel('Name')).toHaveValue('Custom area')
   const [west, south, east, north] = (await fields(page)).map(Number) as [
     number,
     number,

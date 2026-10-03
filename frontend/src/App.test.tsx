@@ -1,14 +1,17 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { layerServer } from '@/test/layerServer'
 import { apiError, jsonResponse, mockApi } from '@/test/mockApi'
-import { layer, project, region, succeededJob, syncJob } from '@/test/fixtures'
+import { amsterdamDraft, layer, project, region, succeededJob, syncJob } from '@/test/fixtures'
 import { renderApp } from '@/test/renderApp'
+import { EMPTY_DRAFT } from '@/features/regions/validation'
 import { useSession } from '@/stores/session'
+import { startRectangleDrawing } from '@/features/layers/regionDrawing'
 import type { SyncJob } from '@/features/syncs/types'
 
 vi.mock('react-map-gl/maplibre', async () => await import('@/test/mockMapLibre'))
+vi.mock('@/features/layers/regionDrawing', () => ({ startRectangleDrawing: vi.fn(() => vi.fn()) }))
 
 // Poll fast so tests do not wait a second per status.
 vi.mock('@/features/syncs/polling', () => ({ POLL_INTERVAL_MS: 5 }))
@@ -25,7 +28,8 @@ function syncSequence(...jobs: SyncJob[]) {
 
 beforeEach(() => {
   useSession.getState().reset()
-  useSession.getState().resetDraft()
+  // The app opens with no area; most tests start from a filled form with its coordinates shown.
+  useSession.setState({ draft: amsterdamDraft, customAreaOpen: true })
   // Only Date is faked, so station freshness is stable while real timers keep polling working.
   vi.useFakeTimers({ toFake: ['Date'] })
   vi.setSystemTime(new Date('2026-10-03T10:00:00Z'))
@@ -54,14 +58,116 @@ describe('App', () => {
     expect(await screen.findByRole('form', { name: 'Region' })).toBeInTheDocument()
   })
 
-  it('opens with a working example region filled in', async () => {
-    mockApi({ ...baseRoutes })
+  describe('before an area is chosen', () => {
+    beforeEach(() => {
+      useSession.setState({ draft: EMPTY_DRAFT, customAreaOpen: false })
+    })
 
-    renderApp()
+    it('opens with no box on the map, a prompt, and nothing to sync', async () => {
+      mockApi({ ...baseRoutes })
 
-    expect(await screen.findByLabelText('Name')).toHaveValue('Amsterdam centre')
-    expect(screen.getByLabelText(/West/)).toHaveValue('4.85')
-    expect(screen.getByLabelText(/North/)).toHaveValue('52.40')
+      renderApp()
+
+      expect(await screen.findByLabelText('Name')).toHaveValue('')
+      const outline = JSON.parse(
+        screen.getByTestId('source-region').getAttribute('data-geojson') ?? '{}',
+      ) as { features?: unknown[]; geometry?: unknown }
+      expect(outline.features).toEqual([])
+      expect(screen.getByText(/search for a place, or choose “draw region”/i)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /create region and sync/i })).toBeDisabled()
+      expect(screen.getByText(/search for a place or draw an area on the map first/i)).toBeVisible()
+    })
+
+    it('keeps the coordinates under "Custom area" until asked for', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      renderApp()
+
+      const toggle = await screen.findByRole('button', { name: 'Custom area' })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByLabelText(/West/)).not.toBeInTheDocument()
+
+      await user.click(toggle)
+      expect(toggle).toHaveAttribute('aria-expanded', 'true')
+      expect(screen.getByLabelText(/West/)).toHaveValue('')
+
+      await user.click(toggle)
+      expect(screen.queryByLabelText(/West/)).not.toBeInTheDocument()
+    })
+
+    it('syncs once coordinates are typed under "Custom area"', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      renderApp()
+
+      await user.click(await screen.findByRole('button', { name: 'Custom area' }))
+      await user.type(screen.getByLabelText('Name'), 'Test area')
+      await user.type(screen.getByLabelText(/West/), '4.85')
+      await user.type(screen.getByLabelText(/South/), '52.35')
+      await user.type(screen.getByLabelText(/East/), '4.95')
+      await user.type(screen.getByLabelText(/North/), '52.40')
+
+      expect(screen.getByRole('button', { name: /create region and sync/i })).toBeEnabled()
+      expect(screen.getByText(/the dashed box is the region you are about to sync/i)).toBeVisible()
+    })
+
+    it('opens "Custom area" by itself, and keeps it open, while the typed box is wrong', async () => {
+      mockApi({ ...baseRoutes })
+      useSession.setState({ draft: { ...amsterdamDraft, minLon: 'west' }, customAreaOpen: false })
+      renderApp()
+
+      expect(await screen.findByLabelText(/West/)).toHaveValue('west')
+      expect(screen.getByRole('button', { name: 'Custom area' })).toBeDisabled()
+      expect(screen.getByText(/this box cannot be used/i)).toBeInTheDocument()
+    })
+
+    it('fills the coordinates, names the region and opens "Custom area" when an area is drawn', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      renderApp()
+      await user.click(await screen.findByRole('button', { name: /draw region/i }))
+      const onBox = vi.mocked(startRectangleDrawing).mock.calls.at(-1)?.[1]
+
+      act(() => {
+        onBox?.([4.8, 52.3, 4.9, 52.4])
+      })
+
+      expect(await screen.findByLabelText(/West/)).toHaveValue('4.8')
+      expect(screen.getByLabelText(/North/)).toHaveValue('52.4')
+      expect(screen.getByLabelText('Name')).toHaveValue('Custom area')
+      expect(screen.getByRole('button', { name: 'Custom area' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      )
+      expect(screen.getByRole('button', { name: /create region and sync/i })).toBeEnabled()
+    })
+
+    it('keeps a name the user typed when an area is drawn', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      renderApp()
+      await user.type(await screen.findByLabelText('Name'), 'My area')
+      await user.click(screen.getByRole('button', { name: /draw region/i }))
+      const onBox = vi.mocked(startRectangleDrawing).mock.calls.at(-1)?.[1]
+
+      act(() => {
+        onBox?.([4.8, 52.3, 4.9, 52.4])
+      })
+
+      expect(await screen.findByLabelText('Name')).toHaveValue('My area')
+    })
+
+    it('opens the first invalid field when a submit fails, even from a collapsed section', async () => {
+      mockApi({ ...baseRoutes })
+      const user = userEvent.setup()
+      useSession.setState({ draft: { ...amsterdamDraft, name: '' }, customAreaOpen: false })
+      renderApp()
+
+      await user.click(await screen.findByRole('button', { name: /create region and sync/i }))
+
+      expect(screen.getByText('Enter a name for the region.')).toBeInTheDocument()
+      expect(screen.getByLabelText('Name')).toHaveFocus()
+    })
   })
 
   it('explains an unreachable backend instead of showing an empty page', async () => {
@@ -571,12 +677,16 @@ describe('App', () => {
         }),
     })
     const user = userEvent.setup()
+    useSession.setState({ draft: EMPTY_DRAFT, customAreaOpen: false })
     renderApp()
 
     await user.type(await screen.findByRole('combobox', { name: /search for a place/i }), 'utrecht')
     await user.click(await screen.findByRole('option', { name: /utrecht/i }))
 
     expect(screen.getByLabelText('Name')).toHaveValue('Utrecht')
+    // The numbers stay under "Custom area"; the box on the map is what shows the chosen area.
+    expect(screen.queryByLabelText(/West/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Custom area' }))
     expect(screen.getByLabelText(/West/)).toHaveValue('5')
     expect(screen.getByLabelText(/North/)).toHaveValue('52.15')
     const outline = JSON.parse(
@@ -598,6 +708,12 @@ describe('App', () => {
 
     await user.type(await screen.findByRole('combobox', { name: /search for a place/i }), 'utrecht')
     expect(await screen.findByRole('alert')).toHaveTextContent(/unavailable/i)
+    expect(screen.getByRole('alert')).toHaveTextContent(/type coordinates or draw an area/i)
+    // The typed way is put in reach: "Custom area" opens by itself when search cannot help.
+    expect(screen.getByRole('button', { name: 'Custom area' })).toHaveAttribute(
+      'aria-expanded',
+      'true',
+    )
     await user.click(screen.getByRole('button', { name: /create region and sync/i }))
 
     expect(await screen.findByTestId('map')).toBeInTheDocument()

@@ -1,3 +1,4 @@
+import type { RegionFormValues } from '@/features/regions/validation'
 import type { MapLayerResponse } from '@/features/layers/types'
 import type { Region } from '@/features/regions/types'
 import type { SyncJob } from '@/features/syncs/types'
@@ -71,4 +72,13 @@ export const layer: MapLayerResponse = {
       },
     ],
   },
+}
+
+/** A filled-in form (central Amsterdam). The app itself opens with no area chosen. */
+export const amsterdamDraft: RegionFormValues = {
+  name: 'Amsterdam centre',
+  minLon: '4.85',
+  minLat: '52.35',
+  maxLon: '4.95',
+  maxLat: '52.40',
 }

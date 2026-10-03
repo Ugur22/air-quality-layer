@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Comparator } from '@/features/layers/filter'
 import type { Bbox, Region } from '@/features/regions/types'
-import { EXAMPLE_REGION, type RegionFormValues } from '@/features/regions/validation'
+import { EMPTY_DRAFT, type RegionFormValues } from '@/features/regions/validation'
 
 /**
  * UI state only: what the user is working on. Server data (projects, sync jobs, layers) lives in
@@ -25,7 +25,9 @@ interface SessionState {
   /** A request to move the map to a box (for example a chosen place); each one has a new id. */
   viewRequest: { bbox: Bbox; id: number } | null
   focusBox: (bbox: Bbox) => void
-  resetDraft: () => void
+  /** The coordinate fields live under a "Custom area" disclosure; true shows them. */
+  customAreaOpen: boolean
+  setCustomAreaOpen: (open: boolean) => void
   setRegion: (region: Region) => void
   setSyncJobId: (id: string) => void
   setColourProperty: (property: string) => void
@@ -46,7 +48,11 @@ export const useSession = create<SessionState>((set) => ({
   setFilterValue: (filterValue) => {
     set({ filterValue })
   },
-  draft: EXAMPLE_REGION,
+  draft: EMPTY_DRAFT,
+  customAreaOpen: false,
+  setCustomAreaOpen: (customAreaOpen) => {
+    set({ customAreaOpen })
+  },
   setDraftField: (field, value) => {
     set((state) => ({ draft: { ...state.draft, [field]: value } }))
   },
@@ -56,9 +62,6 @@ export const useSession = create<SessionState>((set) => ({
   viewRequest: null,
   focusBox: (bbox) => {
     set((state) => ({ viewRequest: { bbox, id: (state.viewRequest?.id ?? 0) + 1 } }))
-  },
-  resetDraft: () => {
-    set({ draft: EXAMPLE_REGION })
   },
   setRegion: (region) => {
     set({ region })

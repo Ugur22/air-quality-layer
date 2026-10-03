@@ -17,6 +17,7 @@ export function Map({
   onMouseMove,
   onMouseLeave,
   mapStyle,
+  initialViewState,
   ref,
 }: {
   children?: ReactNode
@@ -24,6 +25,7 @@ export function Map({
   onMouseMove?: (event: ClickEvent & { point: { x: number; y: number } }) => void
   onMouseLeave?: () => void
   mapStyle?: string
+  initialViewState?: unknown
   ref?: Ref<{ fitBounds: typeof mapSpies.fitBounds; getMap: () => unknown }>
 }) {
   useImperativeHandle(ref, () => ({
@@ -31,7 +33,11 @@ export function Map({
     getMap: () => FAKE_MAP,
   }))
   return (
-    <div data-testid="map" data-style={mapStyle}>
+    <div
+      data-testid="map"
+      data-style={mapStyle}
+      data-initial-view={JSON.stringify(initialViewState ?? null)}
+    >
       {onClick ? (
         <>
           <button

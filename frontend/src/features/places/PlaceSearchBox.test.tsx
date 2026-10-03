@@ -160,13 +160,26 @@ describe('PlaceSearchBox', () => {
     box()
     await user.type(input(), 'netherlands')
 
+    useSession.getState().setDraftField('name', 'Typed name')
     const option = await screen.findByRole('option', { name: /nederland/i })
 
     expect(option).toHaveAttribute('aria-disabled', 'true')
     expect(option).toHaveTextContent(/too large/i)
     await user.click(option)
-    expect(useSession.getState().draft.name).toBe('Amsterdam centre')
+    expect(useSession.getState().draft.name).toBe('Typed name')
     expect(useSession.getState().viewRequest).toBeNull()
+  })
+
+  it('replaces the name an earlier drawn area was given', async () => {
+    mockApi({ [ROUTE]: places(AMSTERDAM) })
+    const user = userEvent.setup({ delay: null })
+    useSession.getState().setDraftField('name', 'Custom area')
+    box()
+
+    await user.type(input(), 'amsterdam')
+    await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
+
+    expect(useSession.getState().draft.name).toBe('Amsterdam')
   })
 
   it('says so when nothing matches', async () => {

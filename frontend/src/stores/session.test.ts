@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
+import { amsterdamDraft } from '@/test/fixtures'
 import { useSession } from './session'
 
 describe('session store: place search support', () => {
   it('sets several draft fields at once and keeps the rest', () => {
+    useSession.setState({ draft: amsterdamDraft })
     useSession.getState().setDraft({ name: 'Park', minLon: '1' })
 
     const { draft } = useSession.getState()

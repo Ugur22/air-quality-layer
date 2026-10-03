@@ -1,6 +1,6 @@
 import { Command } from 'cmdk'
-import { useMemo, useRef, useState } from 'react'
-import { EXAMPLE_REGION } from '@/features/regions/validation'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DRAWN_AREA_NAME } from '@/features/regions/validation'
 import { describeError } from '@/features/syncs/messages'
 import { ApiError } from '@/lib/api'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -15,6 +15,13 @@ function describeSearchError(error: unknown): string {
     return error.message
   }
   return describeError(error)
+}
+
+/** Says what else can be done, unless the message already does (the server's 503 text does). */
+function withFallbackAdvice(message: string): string {
+  return /coordinates|draw/i.test(message)
+    ? message
+    : `${message} You can type coordinates or draw an area instead.`
 }
 
 const MAX_QUERY_LENGTH = 100
@@ -40,6 +47,11 @@ export function PlaceSearchBox() {
   // Searched only while the list is open: filling the box with a chosen name is not a new search.
   const search = usePlaceSearch(settled, open)
   const enough = typed.length >= MIN_QUERY_LENGTH
+  const setCustomAreaOpen = useSession((s) => s.setCustomAreaOpen)
+  // When search cannot help, the typed and drawn ways of defining an area must be in reach.
+  useEffect(() => {
+    if (open && enough && search.isError) setCustomAreaOpen(true)
+  }, [open, enough, search.isError, setCustomAreaOpen])
   // Results belong to what is typed now. While typing goes on, or an answer is a kept-over one
   // for earlier text, nothing old is offered for choosing.
   const fresh = settled === typed && !search.isPlaceholderData
@@ -49,9 +61,9 @@ export function PlaceSearchBox() {
     if (!place.bbox) return
     const [minLon, minLat, maxLon, maxLat] = place.bbox
     const current = useSession.getState().draft.name
-    // The form opens with an example name; a name the user typed themselves is theirs.
+    // A name the user typed themselves is theirs; one this box (or a drawn area) put there is not.
     const replaceName =
-      current.trim() === '' || current === EXAMPLE_REGION.name || current === lastChosenName.current
+      current.trim() === '' || current === DRAWN_AREA_NAME || current === lastChosenName.current
     if (replaceName) lastChosenName.current = place.name
     setDraft({
       ...(replaceName ? { name: place.name } : {}),
@@ -154,7 +166,7 @@ export function PlaceSearchBox() {
       </p>
       {open && enough && search.isError ? (
         <p role="alert" className="text-sm text-bad">
-          {describeSearchError(search.error)}
+          {withFallbackAdvice(describeSearchError(search.error))}
         </p>
       ) : null}
       <p className="text-xs text-muted">
