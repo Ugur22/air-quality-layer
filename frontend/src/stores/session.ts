@@ -21,6 +21,13 @@ interface SessionState {
   /** The region form's values. They live here so the map can preview the box and, later, draw it. */
   draft: RegionFormValues
   setDraftField: (field: keyof RegionFormValues, value: string) => void
+  /**
+   * The name the app, not the user, put in the form (a chosen place, or a drawn area). A name
+   * that is empty or equal to this one may be replaced by the next place or drawn area; anything
+   * else was typed by the user and is kept.
+   */
+  autoName: string | null
+  setAreaName: (name: string) => void
   setDraft: (values: Partial<RegionFormValues>) => void
   /** A request to move the map to a box (for example a chosen place); each one has a new id. */
   viewRequest: { bbox: Bbox; id: number } | null
@@ -49,15 +56,26 @@ export const useSession = create<SessionState>((set) => ({
     set({ filterValue })
   },
   draft: EMPTY_DRAFT,
+  autoName: null,
+  setAreaName: (name) => {
+    set((state) => ({ draft: { ...state.draft, name }, autoName: name }))
+  },
   customAreaOpen: false,
   setCustomAreaOpen: (customAreaOpen) => {
     set({ customAreaOpen })
   },
   setDraftField: (field, value) => {
-    set((state) => ({ draft: { ...state.draft, [field]: value } }))
+    // Typing a name makes it the user's, even if it is the same text as the app's.
+    set((state) => ({
+      draft: { ...state.draft, [field]: value },
+      autoName: field === 'name' ? null : state.autoName,
+    }))
   },
   setDraft: (values) => {
-    set((state) => ({ draft: { ...state.draft, ...values } }))
+    set((state) => ({
+      draft: { ...state.draft, ...values },
+      autoName: values.name === undefined ? state.autoName : null,
+    }))
   },
   viewRequest: null,
   focusBox: (bbox) => {

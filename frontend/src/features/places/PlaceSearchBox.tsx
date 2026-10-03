@@ -1,6 +1,5 @@
 import { Command } from 'cmdk'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { DRAWN_AREA_NAME } from '@/features/regions/validation'
 import { describeError } from '@/features/syncs/messages'
 import { ApiError } from '@/lib/api'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
@@ -34,13 +33,22 @@ const STATUS_ID = 'place-search-status'
  */
 export function PlaceSearchBox() {
   const setDraft = useSession((s) => s.setDraft)
+  const setAreaName = useSession((s) => s.setAreaName)
   const focusBox = useSession((s) => s.focusBox)
   const [text, setText] = useState('')
   const [open, setOpen] = useState(false)
   const [announcement, setAnnouncement] = useState('')
+  // The place last chosen and the four box values it wrote, to notice when the area has moved on.
+  const [chosen, setChosen] = useState<{ name: string; box: string[] } | null>(null)
+  const draft = useSession((s) => s.draft)
   const inputRef = useRef<HTMLInputElement>(null)
-  // The name this box last put into the form, so a later choice may replace it.
-  const lastChosenName = useRef<string | null>(null)
+
+  // Once the area is drawn or typed elsewhere, the chosen place no longer describes it: its name
+  // and the "Region set to" message would be wrong, so the box shows nothing until searched again.
+  const stale =
+    chosen !== null &&
+    [draft.minLon, draft.minLat, draft.maxLon, draft.maxLat].some((v, i) => v !== chosen.box[i])
+  const shownText = stale && text === chosen.name ? '' : text
 
   const typed = useMemo(() => text.trim().replace(/\s+/g, ' '), [text])
   const settled = useDebouncedValue(typed, PLACE_SEARCH_DEBOUNCE_MS)
@@ -60,19 +68,19 @@ export function PlaceSearchBox() {
   const choose = (place: Place) => {
     if (!place.bbox) return
     const [minLon, minLat, maxLon, maxLat] = place.bbox
-    const current = useSession.getState().draft.name
-    // A name the user typed themselves is theirs; one this box (or a drawn area) put there is not.
-    const replaceName =
-      current.trim() === '' || current === DRAWN_AREA_NAME || current === lastChosenName.current
-    if (replaceName) lastChosenName.current = place.name
+    const { draft, autoName } = useSession.getState()
+    // A name the user typed themselves is theirs; one the app put there (a place, a drawn area)
+    // is not.
+    const replaceName = draft.name.trim() === '' || draft.name === autoName
+    if (replaceName) setAreaName(place.name)
     setDraft({
-      ...(replaceName ? { name: place.name } : {}),
       minLon: String(minLon),
       minLat: String(minLat),
       maxLon: String(maxLon),
       maxLat: String(maxLat),
     })
     focusBox(place.bbox)
+    setChosen({ name: place.name, box: place.bbox.map(String) })
     setText(place.name)
     setOpen(false)
     setAnnouncement(
@@ -90,10 +98,10 @@ export function PlaceSearchBox() {
     else if (search.data.length === 0) status = 'No places found.'
     else
       status = `${String(search.data.length)} ${search.data.length === 1 ? 'place' : 'places'} found. Use the arrow keys to choose one.`
-  } else if (text !== '' && !enough) {
+  } else if (shownText !== '' && !enough) {
     status = 'Type at least 3 characters.'
   } else if (!open) {
-    status = announcement
+    status = stale ? '' : announcement
   }
 
   return (
@@ -117,7 +125,7 @@ export function PlaceSearchBox() {
       >
         <Command.Input
           ref={inputRef}
-          value={text}
+          value={shownText}
           maxLength={MAX_QUERY_LENGTH}
           aria-describedby={STATUS_ID}
           onValueChange={(value) => {

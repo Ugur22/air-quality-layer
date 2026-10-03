@@ -1,4 +1,4 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useSession } from '@/stores/session'
@@ -173,13 +173,70 @@ describe('PlaceSearchBox', () => {
   it('replaces the name an earlier drawn area was given', async () => {
     mockApi({ [ROUTE]: places(AMSTERDAM) })
     const user = userEvent.setup({ delay: null })
-    useSession.getState().setDraftField('name', 'Custom area')
+    useSession.getState().setAreaName('Custom area') // what a drawn area is called
     box()
 
     await user.type(input(), 'amsterdam')
     await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
 
     expect(useSession.getState().draft.name).toBe('Amsterdam')
+  })
+
+  it('keeps a name the user typed, even if it is the text the app would have used', async () => {
+    mockApi({ [ROUTE]: places(AMSTERDAM) })
+    const user = userEvent.setup({ delay: null })
+    useSession.getState().setAreaName('Custom area')
+    useSession.getState().setDraftField('name', 'Custom area') // typed by the user
+    box()
+
+    await user.type(input(), 'amsterdam')
+    await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
+
+    expect(useSession.getState().draft.name).toBe('Custom area')
+    expect(screen.getByRole('status')).toHaveTextContent(/name was kept/i)
+  })
+
+  it('keeps the chosen place in the box while the area is the one it set', async () => {
+    mockApi({ [ROUTE]: places(AMSTERDAM) })
+    const user = userEvent.setup({ delay: null })
+    box()
+    await user.type(input(), 'amsterdam')
+
+    await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
+
+    expect(input()).toHaveValue('Amsterdam')
+    expect(screen.getByRole('status')).toHaveTextContent('Region set to Amsterdam')
+  })
+
+  it('empties the box and its message once the area is changed some other way', async () => {
+    mockApi({ [ROUTE]: places(AMSTERDAM) })
+    const user = userEvent.setup({ delay: null })
+    box()
+    await user.type(input(), 'amsterdam')
+    await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
+
+    // drawn on the map, or typed under "Custom area"
+    act(() => {
+      useSession.getState().setDraftField('minLon', '4.8')
+    })
+
+    expect(input()).toHaveValue('')
+    expect(screen.getByRole('status')).not.toHaveTextContent(/region set to/i)
+  })
+
+  it('does not wipe what the user types after the area has changed', async () => {
+    mockApi({ [ROUTE]: places(AMSTERDAM) })
+    const user = userEvent.setup({ delay: null })
+    box()
+    await user.type(input(), 'amsterdam')
+    await user.click(await screen.findByRole('option', { name: /amsterdam/i }))
+    act(() => {
+      useSession.getState().setDraftField('minLon', '4.8')
+    })
+
+    await user.type(input(), 'rot')
+
+    expect(input()).toHaveValue('rot')
   })
 
   it('says so when nothing matches', async () => {

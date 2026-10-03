@@ -203,6 +203,89 @@ describe('App', () => {
       expect(await screen.findByLabelText('Name')).toHaveValue('My area')
     })
 
+    describe('naming the region as the area changes', () => {
+      const UTRECHT = {
+        id: 'R271110',
+        name: 'Utrecht',
+        detail: 'Utrecht, Nederland',
+        kind: 'city',
+        point: [5.12, 52.09],
+        bbox: [5.0, 52.0, 5.2, 52.15],
+      }
+      const routes = {
+        ...baseRoutes,
+        'GET /api/v1/places': () => jsonResponse(200, { places: [UTRECHT] }),
+      }
+
+      async function chooseUtrecht(user: ReturnType<typeof userEvent.setup>) {
+        await user.type(
+          await screen.findByRole('combobox', { name: /search for a place/i }),
+          'utrecht',
+        )
+        await user.click(await screen.findByRole('option', { name: /utrecht/i }))
+      }
+
+      async function drawBox(user: ReturnType<typeof userEvent.setup>) {
+        await user.click(screen.getByRole('button', { name: /draw region/i }))
+        const onBox = vi.mocked(startRectangleDrawing).mock.calls.at(-1)?.[1]
+        act(() => {
+          onBox?.([4.8, 52.3, 4.9, 52.4])
+        })
+      }
+
+      it('renames a region that a place named when an area is drawn instead', async () => {
+        mockApi(routes)
+        const user = userEvent.setup()
+        renderApp()
+        await chooseUtrecht(user)
+        expect(screen.getByLabelText('Name')).toHaveValue('Utrecht')
+
+        await drawBox(user)
+
+        expect(screen.getByLabelText('Name')).toHaveValue('Custom area')
+      })
+
+      it('empties the search box when an area is drawn after a place was chosen', async () => {
+        mockApi(routes)
+        const user = userEvent.setup()
+        renderApp()
+        await chooseUtrecht(user)
+        expect(screen.getByRole('combobox', { name: /search for a place/i })).toHaveValue('Utrecht')
+
+        await drawBox(user)
+
+        expect(screen.getByRole('combobox', { name: /search for a place/i })).toHaveValue('')
+      })
+
+      it('keeps a name the user typed over a place and over a drawn area', async () => {
+        mockApi(routes)
+        const user = userEvent.setup()
+        renderApp()
+        await chooseUtrecht(user)
+        const name = screen.getByLabelText('Name')
+        await user.clear(name)
+        await user.type(name, 'Our office')
+
+        await drawBox(user)
+        expect(screen.getByLabelText('Name')).toHaveValue('Our office')
+
+        await chooseUtrecht(user)
+        expect(screen.getByLabelText('Name')).toHaveValue('Our office')
+      })
+
+      it('lets a place replace the name of a drawn area', async () => {
+        mockApi(routes)
+        const user = userEvent.setup()
+        renderApp()
+        await drawBox(user)
+        expect(screen.getByLabelText('Name')).toHaveValue('Custom area')
+
+        await chooseUtrecht(user)
+
+        expect(screen.getByLabelText('Name')).toHaveValue('Utrecht')
+      })
+    })
+
     it('focuses the name when a submit fails on it while the coordinates are collapsed', async () => {
       mockApi({ ...baseRoutes })
       const user = userEvent.setup()

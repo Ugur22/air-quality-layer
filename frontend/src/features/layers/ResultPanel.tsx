@@ -45,6 +45,7 @@ export function ResultPanel({
   const selectStation = useSession((s) => s.selectStation)
   const setDraftField = useSession((s) => s.setDraftField)
   const setCustomAreaOpen = useSession((s) => s.setCustomAreaOpen)
+  const setAreaName = useSession((s) => s.setAreaName)
   const viewRequest = useSession((s) => s.viewRequest)
   const comparator = useSession((s) => s.filterComparator)
   const filterValue = useSession((s) => s.filterValue)
@@ -59,12 +60,13 @@ export function ResultPanel({
       setDraftField('minLat', String(minLat))
       setDraftField('maxLon', String(maxLon))
       setDraftField('maxLat', String(maxLat))
-      // A drawn area has no name yet, and the region needs one; the numbers are shown so they can
-      // be adjusted.
-      if (useSession.getState().draft.name.trim() === '') setDraftField('name', DRAWN_AREA_NAME)
+      // The area is no longer the place the name came from, and the region needs a name; one the
+      // user typed is kept. The numbers are shown so they can be adjusted.
+      const { draft, autoName } = useSession.getState()
+      if (draft.name.trim() === '' || draft.name === autoName) setAreaName(DRAWN_AREA_NAME)
       setCustomAreaOpen(true)
     },
-    [setDraftField, setCustomAreaOpen],
+    [setDraftField, setAreaName, setCustomAreaOpen],
   )
   const keys = layer?.map_layer.property_keys ?? []
   // A remembered choice only counts while this layer still has that property.

@@ -2,6 +2,31 @@ import { describe, expect, it } from 'vitest'
 import { amsterdamDraft } from '@/test/fixtures'
 import { useSession } from './session'
 
+describe('session store: who named the region', () => {
+  it('remembers a name the app set, so the next place or drawn area may replace it', () => {
+    useSession.getState().setAreaName('Utrecht')
+
+    expect(useSession.getState().draft.name).toBe('Utrecht')
+    expect(useSession.getState().autoName).toBe('Utrecht')
+  })
+
+  it("treats a typed name as the user's, even when it reads the same", () => {
+    useSession.getState().setAreaName('Utrecht')
+    useSession.getState().setDraftField('name', 'Utrecht')
+
+    expect(useSession.getState().autoName).toBeNull()
+  })
+
+  it("treats a name given through setDraft as the user's, and keeps the mark when the name is not touched", () => {
+    useSession.getState().setAreaName('Utrecht')
+    useSession.getState().setDraft({ minLon: '1' })
+    expect(useSession.getState().autoName).toBe('Utrecht')
+
+    useSession.getState().setDraft({ name: 'Mine' })
+    expect(useSession.getState().autoName).toBeNull()
+  })
+})
+
 describe('session store: place search support', () => {
   it('sets several draft fields at once and keeps the rest', () => {
     useSession.setState({ draft: amsterdamDraft })
