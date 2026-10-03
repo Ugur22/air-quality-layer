@@ -1,0 +1,25 @@
+@import 'tailwindcss';
+
+/* AirLayer palette: slate-teal neutrals (a slight hue bias, not pure grey) and one teal accent.
+   good / warn / bad are status colours and are not the accent. */
+@theme {
+  --font-display:
+    'Bricolage Grotesque Variable', 'Bricolage Grotesque', 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+
+  --color-paper: #f1f5f4;
+  --color-surface: #ffffff;
+  --color-ink: #12201f;
+  --color-muted: #4d6360;
+  --color-line: #d2dcda;
+  --color-accent: #0a7570;
+  --color-accent-soft: #dcefed;
+  --color-good: #2e7d5b;
+  --color-warn: #a86b00;
+  --color-bad: #c4392f;
+}
+
+body {
+  @apply bg-paper font-sans text-ink antialiased;
+}
