@@ -132,8 +132,9 @@ export const STATION_LABEL_LAYOUT = {
   'text-font': ['Noto Sans Bold'],
   'text-size': 12,
   'text-anchor': 'left',
-  'text-offset': [1.3, 0],
-  'symbol-sort-key': ['*', -1, ['coalesce', ['get', 'value'], 0]],
+  'text-offset': [1.7, 0],
+  // Highest value first; a station without one goes last, so a dash never pushes out a number.
+  'symbol-sort-key': ['case', ['get', 'hasValue'], ['*', -1, ['get', 'value']], 1e9],
 } as SymbolLayerSpecification['layout']
 
 export const STATION_LABEL_PAINT = {

@@ -1,13 +1,7 @@
 import { formatAge, isStale } from '@/lib/freshness'
 import { formatValue } from '@/lib/format'
+import { newestObservation } from './stationReadings'
 import type { StationFeature } from './types'
-
-function newestObservation(station: StationFeature): string | null {
-  const times = Object.values(station.properties.readings).map((r) => r.observed_at)
-  if (times.length === 0) return null
-  // Compared as instants: timestamp text with different offsets or fractions does not sort by time.
-  return times.reduce((a, b) => (new Date(a).getTime() >= new Date(b).getTime() ? a : b))
-}
 
 export function StationList({
   stations,
@@ -15,6 +9,7 @@ export function StationList({
   onSelect,
   now,
   property = null,
+  unit,
   emptyMessage = 'No stations to show.',
 }: {
   stations: StationFeature[]
@@ -23,14 +18,18 @@ export function StationList({
   now: Date
   /** The reading shown at the right of each row: the one the map is coloured by. */
   property?: string | null
+  /** The unit the map scale uses; a reading in another unit is not comparable and sorts last. */
+  unit?: string
   emptyMessage?: string
 }) {
   if (stations.length === 0) {
     return <p className="px-4 py-3 text-sm text-muted">{emptyMessage}</p>
   }
   // Highest first, so the stations worth a look are on top; those without the reading go last.
-  const valueOf = (station: StationFeature) =>
-    property === null ? undefined : station.properties.readings[property]?.value
+  const valueOf = (station: StationFeature) => {
+    const reading = property === null ? undefined : station.properties.readings[property]
+    return reading && (unit === undefined || reading.unit === unit) ? reading.value : undefined
+  }
   const ordered =
     property === null
       ? stations
@@ -41,6 +40,7 @@ export function StationList({
         const newest = newestObservation(station)
         const stale = newest !== null && isStale(newest, now)
         const reading = property === null ? undefined : station.properties.readings[property]
+        const comparable = valueOf(station) !== undefined
         const readingCount = Object.keys(station.properties.readings).length
         return (
           <li key={station.id}>
@@ -65,7 +65,12 @@ export function StationList({
                     stale
                   </span>
                 ) : null}
-                {reading ? (
+                {reading && !comparable ? (
+                  <span className="font-mono text-xs text-muted">
+                    <span className="sr-only">{property}: </span>
+                    {formatValue(reading.value)} {reading.unit}
+                  </span>
+                ) : reading ? (
                   <span className="font-mono text-base font-semibold tabular-nums">
                     <span className="sr-only">{property}: </span>
                     {formatValue(reading.value)}{' '}

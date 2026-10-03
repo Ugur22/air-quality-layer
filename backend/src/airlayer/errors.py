@@ -4,6 +4,8 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
+from airlayer.history import HistoryUnavailable
+
 
 class ApiError(Exception):
     def __init__(self, status: int, code: str, message: str) -> None:
@@ -20,6 +22,16 @@ def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ApiError)
     async def api_error(_: Request, exc: ApiError) -> JSONResponse:
         return JSONResponse(_body(exc.code, exc.message), status_code=exc.status)
+
+    @app.exception_handler(HistoryUnavailable)
+    async def history_unavailable(_: Request, __: HistoryUnavailable) -> JSONResponse:
+        return JSONResponse(
+            _body(
+                "service_unavailable",
+                "The trend is unavailable right now. Try again in a moment.",
+            ),
+            status_code=503,
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:

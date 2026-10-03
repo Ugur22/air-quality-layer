@@ -73,7 +73,7 @@ describe('StationMap', () => {
 
     const legend = screen.getByRole('group', { name: /legend/i })
     expect(legend).toHaveTextContent(/latest pm25 reading/i)
-    expect(legend).toHaveTextContent(/–.*no pm25 reported/i)
+    expect(legend).toHaveTextContent(/–.*no usable pm25 value/i)
   })
 
   it('draws the outline of the box in the form', () => {
@@ -136,35 +136,67 @@ describe('StationMap', () => {
     expect(onSelect).toHaveBeenNthCalledWith(2, null)
   })
 
-  it('shows a popup only for the selected station and can close it', async () => {
-    const onSelect = vi.fn()
+  it('shows a tooltip with the name and value while the pointer is on a station', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
-    const { rerender } = render(
+    render(
       <StationMap
         layer={layer}
         property="pm25"
         selectedId={null}
-        onSelect={onSelect}
+        onSelect={vi.fn()}
         now={now}
         draftBbox={layer.map_layer.bbox}
       />,
     )
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
 
-    rerender(
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+
+    const tip = screen.getByRole('tooltip')
+    expect(tip).toHaveTextContent('Amsterdam-Van Diemenstraat')
+    expect(tip).toHaveTextContent('pm25 7.6 µg/m³')
+    expect(tip).toHaveTextContent(/click for details/i)
+    expect(tip).toHaveStyle({ left: '24px', top: '34px' })
+  })
+
+  it('removes the tooltip when the pointer moves to empty ground or leaves the map', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
       <StationMap
         layer={layer}
         property="pm25"
-        selectedId="f-2"
-        onSelect={onSelect}
+        selectedId={null}
+        onSelect={vi.fn()}
         now={now}
         draftBbox={layer.map_layer.bbox}
       />,
     )
 
-    expect(screen.getByRole('dialog')).toHaveTextContent('Amsterdam City Center')
-    await user.click(screen.getByRole('button', { name: 'popup: close' }))
-    expect(onSelect).toHaveBeenCalledWith(null)
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+    await user.click(screen.getByRole('button', { name: 'map: hover empty ground' }))
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+    await user.click(screen.getByRole('button', { name: 'map: pointer leaves' }))
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('says a station has no reading of the property in its tooltip', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <StationMap
+        layer={layer}
+        property="o3"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: 'map: hover first station' }))
+
+    expect(screen.getByRole('tooltip')).toHaveTextContent('o3 not reported')
   })
 
   it('explains the colours: the range with its unit, faded means stale, hollow means no value', () => {
@@ -255,22 +287,6 @@ describe('StationMap', () => {
     expect(screen.getByRole('group', { name: /legend/i })).toHaveTextContent(
       /1 station reports pm25 in another unit/i,
     )
-  })
-
-  it('places the popup at the station: longitude first, then latitude', () => {
-    render(
-      <StationMap
-        layer={layer}
-        property="pm25"
-        selectedId="f-2"
-        onSelect={vi.fn()}
-        now={now}
-        draftBbox={layer.map_layer.bbox}
-      />,
-    )
-
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-longitude', '4.9')
-    expect(screen.getByRole('dialog')).toHaveAttribute('data-latitude', '52.37')
   })
 
   it('shows the map before any sync, with the typed box as the outline and no legend', () => {

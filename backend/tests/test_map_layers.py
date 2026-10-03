@@ -331,3 +331,42 @@ async def test_the_whole_backend_flow_from_region_to_filtered_layer(
     station_one = only_high_no2["stations"]["features"][0]
     assert station_one["properties"]["readings"]["no2"]["value"] == 30.0
     assert station_one["geometry"]["coordinates"] == [4.9, 52.37]
+
+
+async def test_missing_data_markers_stored_before_the_rule_are_not_served(
+    client: AsyncClient, make_layer: Callable[..., Layer]
+) -> None:
+    layer = make_layer(
+        stations={
+            1: ("A", 4.9, 52.37, {"pm25": reading(-998.0), "no2": reading(7.0)}),
+            2: ("B", 4.9, 52.38, {"pm25": reading(-999.0), "pm10": reading(-995.0)}),
+            3: ("C", 4.9, 52.39, {"pm25": reading(-989.0)}),
+        }
+    )
+
+    body = (await get_layer(client, layer)).json()
+
+    assert body["map_layer"]["property_keys"] == ["no2", "pm25"]
+    by_name = {
+        f["properties"]["name"]: f["properties"]["readings"] for f in body["stations"]["features"]
+    }
+    assert set(by_name["A"]) == {"no2"}
+    assert by_name["B"] == {}
+    # Above the threshold: kept, a small-looking negative is not a marker.
+    assert by_name["C"]["pm25"]["value"] == -989.0
+    assert body["map_layer"]["station_count"] == 3
+
+
+async def test_a_filter_does_not_match_a_stored_marker_value(
+    client: AsyncClient, make_layer: Callable[..., Layer]
+) -> None:
+    layer = make_layer(
+        stations={
+            1: ("A", 4.9, 52.37, {"pm25": reading(-998.0)}),
+            2: ("B", 4.9, 52.38, {"pm25": reading(3.0)}),
+        }
+    )
+
+    response = await get_layer(client, layer, {"property": "pm25", "comparator": "<", "value": "5"})
+
+    assert names(response.json()) == ["B"]

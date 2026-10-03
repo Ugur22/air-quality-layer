@@ -21,3 +21,18 @@ export interface MapLayerResponse {
   }
   stations: { type: 'FeatureCollection'; features: StationFeature[] }
 }
+
+export interface StationHistory {
+  property: string
+  /** Null when the station has no sensor for the property. */
+  unit: string | null
+  interval: 'hour'
+  from: string
+  to: string
+  /** Hourly values, oldest first; `at` is the end of the hour a value covers. */
+  points: { at: string; value: number }[]
+}
+
+export interface StationHistoryResponse {
+  history: StationHistory
+}

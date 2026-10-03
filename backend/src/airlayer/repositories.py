@@ -2,7 +2,9 @@
 routes never build unscoped queries."""
 
 import base64
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import Row, func, select, tuple_
@@ -21,6 +23,7 @@ from airlayer.models import (
     SyncJob,
     SyncStatus,
 )
+from airlayer.openaq import is_missing_marker
 from airlayer.schemas import (
     MapLayerOut,
     MapLayerResponse,
@@ -248,6 +251,11 @@ async def list_sync_jobs(
     return [_sync_job_out(j) for j in page], next_cursor
 
 
+def _usable(readings: dict[str, Any]) -> dict[str, Any]:
+    """The readings without missing-data markers (a value at or below -990)."""
+    return {k: v for k, v in readings.items() if not is_missing_marker(v["value"])}
+
+
 async def get_map_layer(
     session: AsyncSession,
     ctx: RequestContext,
@@ -291,7 +299,9 @@ async def get_map_layer(
             .order_by(StationReading.openaq_location_id)
         )
     ).all()
-    property_keys = sorted({key for r in rows for key in r.readings})
+    # A layer stored before markers were dropped at sync time still holds them (ADR 0014).
+    cleaned = [(r, _usable(r.readings)) for r in rows]
+    property_keys = sorted({key for _, readings in cleaned for key in readings})
     if layer_filter is not None and layer_filter.property not in property_keys:
         raise ApiError(
             400,
@@ -303,11 +313,11 @@ async def get_map_layer(
             id=r.id,
             geometry=PointGeometry(coordinates=[r.lon, r.lat]),
             properties=StationProperties(
-                name=r.name, readings={k: ReadingOut(**v) for k, v in r.readings.items()}
+                name=r.name, readings={k: ReadingOut(**v) for k, v in readings.items()}
             ),
         )
-        for r in rows
-        if layer_filter is None or layer_filter.matches(r.readings)
+        for r, readings in cleaned
+        if layer_filter is None or layer_filter.matches(readings)
     ]
     return MapLayerResponse(
         map_layer=MapLayerOut(
@@ -319,3 +329,39 @@ async def get_map_layer(
         ),
         stations=StationCollection(features=features),
     )
+
+
+@dataclass(frozen=True)
+class HistoryTarget:
+    openaq_location_id: int
+    property_keys: list[str]
+
+
+async def get_history_target(
+    session: AsyncSession, ctx: RequestContext, layer_id: UUID, station_id: UUID
+) -> HistoryTarget | None:
+    """The OpenAQ location behind one station of a layer, and the layer's property keys.
+
+    None when the layer is not a succeeded job of this organisation, or the station is not in it,
+    so another organisation's ids are indistinguishable from unknown ones."""
+    job_id = await session.scalar(
+        select(SyncJob.id).where(
+            SyncJob.id == layer_id,
+            SyncJob.organisation_id == ctx.organisation_id,
+            SyncJob.status == SyncStatus.SUCCEEDED.value,
+        )
+    )
+    if job_id is None:
+        return None
+    rows = (
+        await session.execute(
+            select(
+                StationReading.id, StationReading.openaq_location_id, StationReading.readings
+            ).where(StationReading.sync_job_id == job_id)
+        )
+    ).all()
+    station = next((r for r in rows if r.id == station_id), None)
+    if station is None:
+        return None
+    keys = sorted({key for r in rows for key in _usable(r.readings)})
+    return HistoryTarget(station.openaq_location_id, keys)

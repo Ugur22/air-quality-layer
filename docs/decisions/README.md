@@ -56,3 +56,4 @@ What becomes easier, harder, or required. Follow-ups.
 - [0011 Drawing a region rectangle on the map](0011-drawing-a-region-rectangle-on-the-map.md) — accepted
 - [0012 MapLibre 6 with an explicit worker URL](0012-maplibre-6-and-explicit-worker-url.md) — accepted
 - [0013 Place search for defining a region](0013-place-search-for-regions.md) — accepted
+- [0014 On-demand station history, and a wider missing-data marker rule](0014-on-demand-station-history.md) — accepted

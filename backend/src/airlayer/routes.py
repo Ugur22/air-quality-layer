@@ -7,12 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from airlayer import repositories as repo
 from airlayer.db import get_session
 from airlayer.errors import ApiError
+from airlayer.history import HistoryProvider, get_history_provider
 from airlayer.identity import RequestContext, get_request_context
 from airlayer.jobs import sync_region
 from airlayer.layers import Comparator, parse_filter
 from airlayer.places import PlaceSearch, ProviderUnavailable, RateLimited, get_place_search
 from airlayer.schemas import (
     ErrorResponse,
+    HistoryOut,
+    HistoryPointOut,
+    HistoryResponse,
     MapLayerResponse,
     PlaceListResponse,
     PlaceOut,
@@ -35,7 +39,10 @@ _R400 = {"model": ErrorResponse, "description": "validation_failed"}
 _R401 = {"model": ErrorResponse, "description": "unauthorized (outside development)"}
 _R503 = {
     "model": ErrorResponse,
-    "description": "service_unavailable (a sync could not be queued, or place search is down)",
+    "description": (
+        "service_unavailable (a sync could not be queued, place search is down, "
+        "or a station trend is unavailable)"
+    ),
 }
 _R429 = {"model": ErrorResponse, "description": "rate_limited (too many place searches)"}
 _R409 = {"model": ErrorResponse, "description": "conflict (a sync is already running)"}
@@ -173,6 +180,47 @@ async def get_map_layer(
     if layer is None:
         raise repo.not_found("Map layer")
     return layer
+
+
+@router.get(
+    "/map-layers/{map_layer_id}/stations/{station_id}/history",
+    responses={400: _R400, 401: _R401, 404: _R404, 503: _R503},
+)
+async def get_station_history(
+    map_layer_id: str,
+    station_id: str,
+    ctx: Context,
+    session: Session,
+    provider: Annotated[HistoryProvider, Depends(get_history_provider)],
+    property: Annotated[  # noqa: A002 - the public query parameter name (api-contracts.md)
+        str, Query(description="A pollutant from the layer's property_keys, e.g. pm25.")
+    ],
+    hours: Annotated[int, Query(ge=1, le=168, description="Window length, 1 to 168.")] = 24,
+) -> HistoryResponse:
+    lid, sid = repo.parse_id(map_layer_id), repo.parse_id(station_id)
+    if lid is None or sid is None:
+        raise repo.invalid_id("Station")
+    target = await repo.get_history_target(session, ctx, lid, sid)
+    if target is None:
+        raise repo.not_found("Station")
+    if property not in target.property_keys:
+        raise ApiError(
+            400,
+            "validation_failed",
+            f"property must be one of: {', '.join(target.property_keys) or '(none)'}.",
+        )
+    # Ends the read transaction, so the pooled connection is not held through two OpenAQ calls.
+    await session.rollback()
+    result, start, end = await provider.history(target.openaq_location_id, property, hours)
+    return HistoryResponse(
+        history=HistoryOut(
+            property=property,
+            unit=result.unit,
+            from_=start,
+            to=end,
+            points=[HistoryPointOut(at=p.at, value=p.value) for p in result.points],
+        )
+    )
 
 
 @router.get(

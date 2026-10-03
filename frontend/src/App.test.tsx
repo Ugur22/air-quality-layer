@@ -440,23 +440,26 @@ describe('App', () => {
     ])
   })
 
-  it('opens a popup when a station is clicked in the list or on the map, and closes it', async () => {
+  it('opens the station dialog from the list or the map, and closes it', async () => {
     mockApi({ ...baseRoutes, 'GET /api/v1/syncs/:id': syncSequence(succeededJob) })
     const user = userEvent.setup()
     renderApp()
     await user.click(await screen.findByRole('button', { name: /create region and sync/i }))
 
     await user.click(await screen.findByRole('button', { name: /amsterdam city center/i }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('Amsterdam City Center')
-    expect(screen.getByRole('button', { name: /amsterdam city center/i })).toHaveAttribute(
-      'aria-pressed',
-      'true',
-    )
+    expect(screen.getByRole('dialog', { name: 'Amsterdam City Center' })).toBeInTheDocument()
+    // The page behind a modal is hidden from assistive technology, so look it up as hidden.
+    expect(
+      screen.getByRole('button', { name: /amsterdam city center/i, hidden: true }),
+    ).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: /close station details/i }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'map: click first station' }))
-    expect(screen.getByRole('dialog')).toHaveTextContent('Amsterdam-Van Diemenstraat')
+    expect(screen.getByRole('dialog', { name: 'Amsterdam-Van Diemenstraat' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'map: click empty ground' }))
+    await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

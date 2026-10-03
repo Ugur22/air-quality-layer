@@ -145,6 +145,27 @@ async def test_the_minus_999_missing_value_marker_is_not_stored_as_a_reading() -
     assert set(station.readings) == {"pm25"}
 
 
+@pytest.mark.parametrize("marker", [-999.0, -998.0, -995.0, -990.0])
+async def test_every_missing_data_marker_at_or_below_minus_990_is_dropped(marker: float) -> None:
+    # Seen in real OpenAQ data: -999, -998 and -995 (ADR 0014).
+    upstream = Upstream(
+        [location(1, [sensor(11, "pm25"), sensor(12, "no")])],
+        {1: [latest(11, 1, 7.6), latest(12, 1, marker)]},
+    )
+
+    (station,) = await client_for(upstream).fetch_stations(BBOX)
+
+    assert set(station.readings) == {"pm25"}
+
+
+async def test_a_value_just_above_the_marker_threshold_is_kept() -> None:
+    upstream = Upstream([location(1)], {1: [latest(10, 1, -989.9)]})
+
+    (station,) = await client_for(upstream).fetch_stations(BBOX)
+
+    assert station.readings["pm25"].value == -989.9
+
+
 async def test_small_negative_values_are_real_measurements_and_are_kept() -> None:
     upstream = Upstream([location(1)], {1: [latest(10, 1, -0.4)]})
 

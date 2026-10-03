@@ -64,7 +64,7 @@ describe('StationList', () => {
     const rows = screen.getAllByRole('listitem')
     expect(within(rows[0] as HTMLElement).getByText('p0:')).toBeInTheDocument()
     expect(within(rows[0] as HTMLElement).getByText('x')).toBeInTheDocument()
-    expect(within(rows[1] as HTMLElement).queryByText(/µg/)).not.toBeInTheDocument()
+    expect(within(rows[1] as HTMLElement).getByText('no p0')).toBeInTheDocument()
   })
 
   it('lists the highest value of the chosen property first and stations without it last', () => {
@@ -84,6 +84,43 @@ describe('StationList', () => {
     expect(names[1]).toContain('Amsterdam-Van Diemenstraat')
     expect(names[2]).toContain('No reading')
     expect(names[2]).toContain('no pm25')
+  })
+
+  it('sorts a reading in another unit last and does not emphasise it', () => {
+    const other = withTimes(['2026-10-03T09:00:00Z'])
+    const ppm = {
+      ...other,
+      id: 'ppm',
+      properties: {
+        name: 'In ppm',
+        readings: { pm25: { value: 900, unit: 'ppm', observed_at: '2026-10-03T09:00:00Z' } },
+      },
+    }
+    render(
+      <StationList
+        stations={[ppm, first, second]}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        property="pm25"
+        unit="µg/m³"
+      />,
+    )
+
+    const rows = screen.getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Amsterdam City Center')
+    expect(rows[2]).toHaveTextContent('In ppm')
+    expect(rows[2]).toHaveTextContent('900 ppm')
+  })
+
+  it('keeps the given order when no property is chosen', () => {
+    render(
+      <StationList stations={[second, first]} selectedId={null} onSelect={vi.fn()} now={now} />,
+    )
+
+    const rows = screen.getAllByRole('listitem')
+    expect(rows[0]).toHaveTextContent('Amsterdam City Center')
+    expect(rows[1]).toHaveTextContent('Amsterdam-Van Diemenstraat')
   })
 
   it('says so when there are no stations', () => {

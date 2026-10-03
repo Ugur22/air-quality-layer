@@ -10,7 +10,8 @@ import { useFilteredMapLayer } from './api'
 import { parseFilterValue, type LayerFilter } from './filter'
 import { FILTER_DEBOUNCE_MS } from './filterTiming'
 import { LayerFilterControls } from './LayerFilterControls'
-import { pickColourProperty } from './mapData'
+import { pickColourProperty, valueRange } from './mapData'
+import { StationDialog } from './StationDialog'
 import { StationList } from './StationList'
 import { StationMap } from './StationMap'
 import type { MapLayerResponse } from './types'
@@ -106,6 +107,7 @@ export function ResultPanel({
     [allStations, visibleIds],
   )
   const selectedId = stations.some((s) => s.id === selectedStationId) ? selectedStationId : null
+  const selectedStation = stations.find((s) => s.id === selectedId)
 
   return (
     <div className="grid h-full lg:grid-cols-[22.5rem_minmax(0,1fr)]">
@@ -167,6 +169,7 @@ export function ResultPanel({
                 onSelect={selectStation}
                 now={now}
                 property={property}
+                unit={valueRange(allStations, property)?.unit}
                 emptyMessage={visibleIds ? 'No stations match this filter.' : undefined}
               />
             </div>
@@ -221,6 +224,19 @@ export function ResultPanel({
           </section>
         ) : null}
       </section>
+      {selectedStation && layer ? (
+        <StationDialog
+          key={selectedStation.id}
+          station={selectedStation}
+          stations={allStations}
+          layerId={layer.map_layer.id}
+          property={property}
+          now={now}
+          onClose={() => {
+            selectStation(null)
+          }}
+        />
+      ) : null}
     </div>
   )
 }

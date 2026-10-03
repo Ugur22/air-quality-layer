@@ -12,7 +12,7 @@ const buttonVariants = cva(
         outline: 'border border-line bg-surface text-ink hover:bg-accent-soft',
         ghost: 'text-ink hover:bg-accent-soft',
       },
-      size: { default: 'h-10 px-4 py-2', sm: 'h-8 px-3' },
+      size: { default: 'h-10 px-4 py-2', sm: 'h-8 px-3', icon: 'size-8 shrink-0' },
     },
     defaultVariants: { variant: 'default', size: 'default' },
   },

@@ -8,16 +8,21 @@ import { FAKE_MAP, mapSpies } from './mapSpies'
  */
 interface ClickEvent {
   features?: { properties?: Record<string, unknown> }[]
+  point?: { x: number; y: number }
 }
 
 export function Map({
   children,
   onClick,
+  onMouseMove,
+  onMouseLeave,
   mapStyle,
   ref,
 }: {
   children?: ReactNode
   onClick?: (event: ClickEvent) => void
+  onMouseMove?: (event: ClickEvent & { point: { x: number; y: number } }) => void
+  onMouseLeave?: () => void
   mapStyle?: string
   ref?: Ref<{ fitBounds: typeof mapSpies.fitBounds; getMap: () => unknown }>
 }) {
@@ -47,6 +52,31 @@ export function Map({
           </button>
         </>
       ) : null}
+      {onMouseMove ? (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              onMouseMove({ features: [{ properties: { id: 'f-1' } }], point: { x: 10, y: 20 } })
+            }}
+          >
+            map: hover first station
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              onMouseMove({ features: [], point: { x: 5, y: 5 } })
+            }}
+          >
+            map: hover empty ground
+          </button>
+        </>
+      ) : null}
+      {onMouseLeave ? (
+        <button type="button" onClick={onMouseLeave}>
+          map: pointer leaves
+        </button>
+      ) : null}
       {children}
     </div>
   )
@@ -75,32 +105,6 @@ export function Layer({ id, paint, layout }: { id: string; paint?: unknown; layo
       data-paint={JSON.stringify(paint ?? {})}
       data-layout={JSON.stringify(layout ?? {})}
     />
-  )
-}
-
-export function Popup({
-  children,
-  onClose,
-  longitude,
-  latitude,
-}: {
-  children?: ReactNode
-  onClose?: () => void
-  longitude?: number
-  latitude?: number
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-label="Station details"
-      data-longitude={longitude}
-      data-latitude={latitude}
-    >
-      {children}
-      <button type="button" onClick={onClose}>
-        popup: close
-      </button>
-    </div>
   )
 }
 

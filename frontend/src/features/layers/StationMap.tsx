@@ -1,7 +1,7 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import { SquareDashedMousePointer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Layer, Map, NavigationControl, Popup, Source, type MapRef } from 'react-map-gl/maplibre'
+import { Layer, Map, NavigationControl, Source, type MapRef } from 'react-map-gl/maplibre'
 import type { Bbox } from '@/features/regions/types'
 import { Button } from '@/components/ui/button'
 import { BASEMAP_STYLE_URL } from '@/lib/config'
@@ -16,7 +16,7 @@ import {
   valueRange,
 } from './mapData'
 import { startRectangleDrawing } from './regionDrawing'
-import { StationPopup } from './StationPopup'
+import { StationTooltip } from './StationTooltip'
 import type { MapLayerResponse } from './types'
 
 // The legend floats over the bottom-left corner, so a fitted region leaves room under it.
@@ -98,9 +98,7 @@ function Legend({
             >
               {NO_VALUE_LABEL}
             </span>
-            <span>
-              <span className="sr-only">{NO_VALUE_LABEL} </span>No {property} reported
-            </span>
+            <span>No usable {property} value</span>
           </p>
         </div>
       ) : null}
@@ -161,6 +159,8 @@ export function StationMap({
 }) {
   const mapRef = useRef<MapRef>(null)
   const [pointer, setPointer] = useState(false)
+  // The station under the pointer and where, for the tooltip.
+  const [hover, setHover] = useState<{ id: string; x: number; y: number } | null>(null)
   const [drawing, setDrawing] = useState(false)
   // One live region, always mounted, so a screen reader announces each change.
   const [announcement, setAnnouncement] = useState('')
@@ -185,7 +185,7 @@ export function StationMap({
     () => (layerBbox && showSyncedBox ? outline(layerBbox) : EMPTY),
     [layerBbox, showSyncedBox],
   )
-  const selected = visible.find((s) => s.id === selectedId)
+  const hovered = hover === null ? undefined : visible.find((s) => s.id === hover.id)
 
   // initialViewState frames the first view. When a sync finishes (or another one replaces it) the
   // camera moves to that region; typing in the form never moves the camera.
@@ -282,8 +282,17 @@ export function StationMap({
           onMouseEnter={() => {
             setPointer(true)
           }}
+          onMouseMove={(event) => {
+            const id: unknown = event.features?.[0]?.properties.id
+            setHover(
+              typeof id === 'string' && !drawing
+                ? { id, x: event.point.x, y: event.point.y }
+                : null,
+            )
+          }}
           onMouseLeave={() => {
             setPointer(false)
+            setHover(null)
           }}
           onClick={(event) => {
             // A drag in drawing mode must not select (or deselect) a station.
@@ -334,24 +343,11 @@ export function StationMap({
               }}
             />
           </Source>
-          {selected ? (
-            <Popup
-              longitude={selected.geometry.coordinates[0]}
-              latitude={selected.geometry.coordinates[1]}
-              maxWidth="320px"
-              offset={16}
-              closeOnClick={false}
-              // Keep keyboard focus where it was (e.g. the list row) instead of jumping into the map.
-              focusAfterOpen={false}
-              onClose={() => {
-                onSelect(null)
-              }}
-            >
-              <StationPopup station={selected} now={now} property={property} />
-            </Popup>
-          ) : null}
         </Map>
       </div>
+      {hovered && hover ? (
+        <StationTooltip station={hovered} property={property} now={now} x={hover.x} y={hover.y} />
+      ) : null}
       {layer ? <Legend property={property} range={range} showSyncedBox={showSyncedBox} /> : null}
     </div>
   )

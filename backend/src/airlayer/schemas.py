@@ -161,3 +161,24 @@ class PlaceOut(BaseModel):
 
 class PlaceListResponse(BaseModel):
     places: list[PlaceOut]
+
+
+class HistoryPointOut(BaseModel):
+    # The end of the hour the value covers (OpenAQ period.datetimeTo), UTC.
+    at: datetime
+    value: float
+
+
+class HistoryOut(BaseModel):
+    property: str
+    # None only when the station has no sensor for the property.
+    unit: str | None
+    interval: Literal["hour"] = "hour"
+    # The window asked for: `to` is when the answer was made.
+    from_: datetime = Field(serialization_alias="from")
+    to: datetime
+    points: list[HistoryPointOut]
+
+
+class HistoryResponse(BaseModel):
+    history: HistoryOut

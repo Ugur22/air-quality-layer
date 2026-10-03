@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from fastapi.openapi.utils import get_openapi
 
 from airlayer.errors import install_error_handlers
+from airlayer.history import close_history_provider
 from airlayer.jobs import app as jobs_app
 from airlayer.logs import protect_search_text
 from airlayer.places import close_place_search
@@ -20,6 +21,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
             yield
     finally:
         await close_place_search()
+        await close_history_provider()
 
 
 app = FastAPI(title="AirLayer API", lifespan=lifespan)

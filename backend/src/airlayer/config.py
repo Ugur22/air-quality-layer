@@ -34,6 +34,8 @@ class Settings(BaseSettings):
     sync_timeout_minutes: int = 10
     # Base of the exponential backoff between retries (2 gives 2s, 4s, 8s); tests set it to 0.
     sync_retry_wait_seconds: int = 2
+    # Station history (ADR 0014): fetched from OpenAQ per request, cached in memory this long.
+    history_cache_seconds: float = 300.0
     dev_organisation_id: UUID = UUID("00000000-0000-4000-8000-000000000001")
     dev_actor_id: UUID = UUID("00000000-0000-4000-8000-0000000000a1")
 

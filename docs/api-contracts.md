@@ -1,6 +1,6 @@
 # API contracts
 
-All sections (0 to 6) are implemented and tested on the backend; the web UI for section 6 (place search) is not built yet. Items tagged Decided come from ADR 0010. Modelled on Layerline's contract shape (same conventions and error shape) but adapted to a pull-based domain. Terms follow `domain.md`. Contract changes go through the `api-contract-review` skill.
+Sections 0 to 6 are implemented and tested on the backend; section 7 (station history) is added by ADR 0014. Items tagged Decided come from ADR 0010. Modelled on Layerline's contract shape (same conventions and error shape) but adapted to a pull-based domain. Terms follow `domain.md`. Contract changes go through the `api-contract-review` skill.
 
 ## Conventions
 
@@ -18,7 +18,7 @@ All sections (0 to 6) are implemented and tested on the backend; the web UI for 
 { "error": { "code": "validation_failed", "message": "Human-readable summary", "details": [] } }
 ```
 
-Initial codes: `validation_failed` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409, Decided, ADR 0010), `service_unavailable` (503, a sync could not be queued, or place search is unavailable), `rate_limited` (429, place search was called too often; ADR 0013). Sync-specific codes live on sync jobs (section 3), not in this envelope. Clients must render unknown codes safely.
+Initial codes: `validation_failed` (400), `unauthorized` (401), `forbidden` (403), `not_found` (404), `conflict` (409, Decided, ADR 0010), `service_unavailable` (503, a sync could not be queued, place search is unavailable, or a station trend is unavailable), `rate_limited` (429, place search was called too often; ADR 0013). Sync-specific codes live on sync jobs (section 3), not in this envelope. Clients must render unknown codes safely.
 
 ## 0. Bootstrap reads (Decided, ADR 0010)
 
@@ -127,7 +127,7 @@ Notes:
   { "name": "…", "readings": { "pm25": { "value": 12.4, "unit": "µg/m³", "observed_at": "…" } } }
   ```
 
-  `readings` holds the latest value per parameter OpenAQ returned; `value` is a number. A value of exactly `-999`, which OpenAQ sends where a sensor has no measurement, is dropped instead of stored; other negative values are kept. Readings are not filtered by age: a station that stopped reporting keeps its old `observed_at`, so clients can show how stale it is. The filter below compares against `readings.<property>.value`.
+  `readings` holds the latest value per parameter OpenAQ returned; `value` is a number. A value at or below `-990`, which OpenAQ sends as a marker where a sensor has no measurement (`-999`, `-998` and `-995` were seen in real responses), is dropped instead of stored, and a layer stored before this rule is read without such values; values above `-990`, including small negatives, are kept (Decided, ADR 0014; the threshold is a starting value). Readings are not filtered by age: a station that stopped reporting keeps its old `observed_at`, so clients can show how stale it is. The filter below compares against `readings.<property>.value`.
 
 - Coordinates are `[longitude, latitude]` in WGS84, matching Layerline's convention (Decided).
 - Each feature's `id` is the stored station reading's own id (Decided, for stable client-side matching across a filtered and unfiltered request, same guarantee as Layerline).
@@ -188,6 +188,37 @@ Looks a place name up through Photon (OpenStreetMap data) so a region can be def
 - Results are cached on the server for 10 minutes per normalised query. Failures are not cached, but after one Photon is not asked again for 30 seconds: new searches during that time get `503` at once (cached answers are still served). Searches for the same text at the same moment share one Photon request. The server also keeps itself under 20 Photon requests per 10 seconds per server process (starting values; with several worker processes the total is higher); a place box that passes the 2 degree rule can still contain more stations than the sync cap, which is reported when it is synced (`too_many_stations`).
 - Authentication as for every endpoint (dev placeholder identity, `401 unauthorized` outside development).
 - Errors: `400 validation_failed` (`q` missing, too short or too long; malformed `X-Dev-Organisation-Id`), `401 unauthorized`, `429 rate_limited` (the server has already made too many Photon requests in a short time; cached answers do not count; retry shortly), `503 service_unavailable` (Photon unreachable, slow, answering with an error, or sending an unusable response; clients keep the typed and drawn ways of defining a region).
+
+## 7. Station history (Decided, ADR 0014)
+
+`GET /api/v1/map-layers/{map_layer_id}/stations/{station_id}/history?property=pm25&hours=24`
+
+Hourly values of one pollutant at one station, fetched from OpenAQ when the request arrives and not stored. The browser never calls OpenAQ.
+
+`200 OK`:
+
+```json
+{
+  "history": {
+    "property": "pm25",
+    "unit": "µg/m³",
+    "interval": "hour",
+    "from": "2026-10-02T14:00:00Z",
+    "to": "2026-10-03T14:00:00Z",
+    "points": [ { "at": "2026-10-02T15:00:00Z", "value": 3.9 } ]
+  }
+}
+```
+
+- `station_id` is the `id` of a feature of that map layer (section 4). `map_layer_id` and `station_id` outside the caller's organisation, unknown, or not a succeeded job's layer are `404 not_found`; a malformed id is also `404`.
+- `property` is required and must be one of the layer's `property_keys` (`400 validation_failed` otherwise; the message lists the keys). A station that does not report that property, or has no sensor for it, returns `points: []` and `unit: null`.
+- `hours` is a whole number from 1 to 168, default 24 (`400 validation_failed` otherwise). `from` is the start of the window and `to` its end, both UTC: the moment the data was fetched from OpenAQ, which is up to 5 minutes earlier when the answer comes from the cache.
+- `at` is the end of the hour a value covers (OpenAQ `period.datetimeTo`). Points are ordered oldest first, one per hour at most, and values at or below `-990` are left out (section 4). A gap in the data is a missing point, never a zero.
+- `unit` is the unit OpenAQ reports for the sensor; it is `null` only when the station has no sensor for the property.
+- OpenAQ unreachable, slow, rate limiting us (the server never waits out a rate-limit pause inside a request), rejecting the key, answering with more hours than asked for, or answering with a response that does not match the expected shape is `503 service_unavailable`; so is a server with no OpenAQ key configured, but only after the ids, `property` and `hours` have been checked (`404`, `400`); no partial points are returned. The `message` says the trend is unavailable, not why.
+- Responses are cached on the server for 5 minutes per OpenAQ location, pollutant and `hours` (a starting value). Failures are not cached. Identical requests that arrive while one is being fetched share its answer.
+- Authentication as for every endpoint (dev placeholder identity, `401 unauthorized` outside development).
+- Errors: `400 validation_failed` (bad `property` or `hours`, malformed `X-Dev-Organisation-Id`), `401 unauthorized`, `404 not_found`, `503 service_unavailable`.
 
 ## Open questions
 

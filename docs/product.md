@@ -24,7 +24,7 @@ Roles, not personas; no real users exist yet.
 
 - No alerts, notifications, or thresholds that trigger anything.
 - No AQI index computation; the first slice shows a station's raw parameter values and units. Which AQI formula (if any) to adopt later is **Open**.
-- No historical time series or trend charts (planned later, out of scope now; Layerline added an analogous chart after its first slice, see `docs/decisions/README.md` pattern).
+- No stored history, no scheduled collection, and no time-series analysis. One exception (ADR 0014): clicking a station can show a recent window (the last 24 hours in the UI) of one pollutant, fetched from OpenAQ at that moment and not stored.
 - No scheduled or recurring sync. Sync is triggered by a user action only. Backlog (not planned): revisit only once a pull-based refresh cadence is actually wanted, which also requires deciding what a re-sync does to existing station readings (see `domain.md`).
 - No real-time collaboration, no offline mode.
 - No third-party integrations, billing, or public API for external consumers.

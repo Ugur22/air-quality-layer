@@ -6,7 +6,7 @@ import asyncio
 import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any
 
 import httpx
@@ -15,9 +15,14 @@ from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_val
 LOCATIONS_PAGE_SIZE = 1000
 # Never sleep longer than the rate-limit window itself, whatever the header claims.
 MAX_PAUSE_SECONDS = 60.0
-# OpenAQ data carries -999 where a sensor has no measurement; it is not a value (seen in real
-# responses). Only this exact marker is dropped: small negatives are legitimate readings.
-MISSING_VALUE = -999.0
+# OpenAQ data carries a marker where a sensor has no measurement; it is not a value. -999, -998 and
+# -995 were seen in real responses (ADR 0014), so anything at or below this threshold is dropped.
+# Values above it, including small negatives, are legitimate readings. A starting value.
+MISSING_VALUE_AT_OR_BELOW = -990.0
+
+
+def is_missing_marker(value: float) -> bool:
+    return value <= MISSING_VALUE_AT_OR_BELOW
 
 
 class UpstreamError(Exception):
@@ -47,6 +52,18 @@ class Reading:
     value: float
     unit: str
     observed_at: datetime
+
+
+@dataclass(frozen=True)
+class HistoryPoint:
+    at: datetime
+    value: float
+
+
+@dataclass(frozen=True)
+class StationHistory:
+    unit: str | None
+    points: list[HistoryPoint]
 
 
 @dataclass(frozen=True)
@@ -118,6 +135,35 @@ class _LatestPage(BaseModel):
     results: list[_Latest]
 
 
+class _SensorsPage(BaseModel):
+    results: list[_Sensor]
+
+
+class _Period(BaseModel):
+    datetimeTo: _Datetime
+
+
+class _Hour(BaseModel):
+    value: Annotated[float, Field(strict=True)]
+    period: _Period
+
+    @field_validator("value")
+    @classmethod
+    def finite(cls, v: float) -> float:
+        if not math.isfinite(v):
+            raise ValueError("value must be finite")
+        return v
+
+
+class _HoursPage(BaseModel):
+    meta: _Meta
+    results: list[_Hour]
+
+
+def _utc(moment: datetime) -> str:
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def make_http_client(*, api_key: str, base_url: str, timeout: float) -> httpx.AsyncClient:
     return httpx.AsyncClient(
         base_url=base_url, headers={"X-API-Key": api_key}, timeout=httpx.Timeout(timeout)
@@ -167,6 +213,45 @@ class OpenAQClient:
             stations.append(await self._snapshot(loc))
         return stations
 
+    async def fetch_history(
+        self, location_id: int, property_name: str, *, start: datetime, end: datetime
+    ) -> StationHistory:
+        """Hourly values of one pollutant at one location, oldest first, one per hour.
+
+        Two calls: the location's sensors (to find the pollutant's sensor), then that sensor's
+        hourly values. A location without a sensor for the pollutant has no history."""
+        sensors = self._parse(
+            _SensorsPage, await self._get(f"/locations/{location_id}/sensors", {})
+        )
+        sensor = next((s for s in sensors.results if s.parameter.name == property_name), None)
+        if sensor is None:
+            return StationHistory(unit=None, points=[])
+        limit = max(int((end - start).total_seconds() / 3600) + 2, 3)
+        page = self._parse(
+            _HoursPage,
+            await self._get(
+                f"/sensors/{sensor.id}/hours",
+                {
+                    # `date_from` / `date_to` are silently ignored by OpenAQ, which then answers
+                    # with the oldest data and status 200; these are the real names (ADR 0014).
+                    "datetime_from": _utc(start),
+                    "datetime_to": _utc(end),
+                    "limit": limit,
+                },
+            ),
+        )
+        # OpenAQ answers oldest first, so a capped answer would lose the newest hours: the ones a
+        # trend is for. One result per hour fits the limit; more means something is off.
+        if isinstance(page.meta.found, str) or page.meta.found > limit:
+            raise _invalid("OpenAQ returned more hours than were asked for.")
+        by_hour: dict[datetime, float] = {}
+        for item in page.results:
+            if not is_missing_marker(item.value):
+                # Two results for the same hour would draw a vertical jump; the first one wins.
+                by_hour.setdefault(item.period.datetimeTo.utc, item.value)
+        points = [HistoryPoint(at.astimezone(UTC), by_hour[at]) for at in sorted(by_hour)]
+        return StationHistory(unit=sensor.parameter.units, points=points)
+
     async def _snapshot(self, loc: _Location) -> StationSnapshot:
         sensors = {s.id: s.parameter for s in loc.sensors}
         latest = self._parse(_LatestPage, await self._get(f"/locations/{loc.id}/latest", {}))
@@ -175,7 +260,7 @@ class OpenAQClient:
             parameter = sensors.get(item.sensorsId)
             if parameter is None:
                 raise _invalid(f"Latest value for unknown sensor {item.sensorsId}.")
-            if item.value == MISSING_VALUE:
+            if is_missing_marker(item.value):
                 continue
             reading = Reading(item.value, parameter.units, item.datetime.utc)
             current = readings.get(parameter.name)

@@ -251,14 +251,13 @@ describe('ResultPanel filter', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/property must be one of/i)
   })
 
-  it('closes the popup of a station the filter has removed', async () => {
+  it('opens no dialog for a selected station the filter has removed', async () => {
     mockApi({ [LAYER_ROUTE]: layerServer(layer) })
-    const user = userEvent.setup({ delay: null })
+    // A modal dialog makes the filter unreachable, so the filter is set before the station is
+    // selected: the selected station (f-1, 7.6) does not match "pm25 > 30".
+    useSession.setState({ filterValue: '30', selectedStationId: 'f-1' })
     panel()
-    await user.click(screen.getByRole('button', { name: /amsterdam-van diemenstraat/i }))
-    expect(screen.getByRole('dialog')).toBeInTheDocument()
 
-    await user.type(screen.getByLabelText('Value'), '30')
     await screen.findByText('Showing 1 of 2 stations.')
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
