@@ -11,7 +11,10 @@ import {
   pickColourProperty,
   stationBadgePaint,
   stationFill,
-  STATION_BADGE_LAYOUT,
+  stationBadgeLayout,
+  STALE_DOT_FILTER,
+  STATION_DOT_EDGE_PAINT,
+  staleBadgeImage,
   STATION_DOT_LAYOUT,
   STATION_EMPTY_PAINT,
   stationDotPaint,
@@ -216,10 +219,17 @@ describe('stationBadgePaint', () => {
           id: 'stations',
           type: 'symbol',
           source: 's',
-          layout: STATION_BADGE_LAYOUT,
+          layout: stationBadgeLayout(range, property),
           paint: stationBadgePaint(range, property),
         },
         { id: 'empty', type: 'circle', source: 's', paint: STATION_EMPTY_PAINT },
+        {
+          id: 'dot-edge',
+          type: 'circle',
+          source: 's',
+          filter: STALE_DOT_FILTER,
+          paint: STATION_DOT_EDGE_PAINT,
+        },
         {
           id: 'dot',
           type: 'circle',
@@ -260,15 +270,32 @@ describe('stationBadgePaint', () => {
   it('draws the border as the badge’s own halo, so it is placed or dropped with it', () => {
     const paint = stationBadgePaint({ min: 0, max: 10, unit: 'µg/m³', otherUnitCount: 0 })
 
-    expect(paint?.['icon-halo-width']).toBeGreaterThan(0)
-    expect(JSON.stringify(paint?.['icon-halo-color'])).toContain('stale')
+    expect(JSON.stringify(paint?.['icon-halo-color'])).toContain('#12201f')
+    expect(paint?.['icon-halo-width']).toEqual(['case', ['get', 'stale'], 3, 1.5])
   })
 
-  it('tints a stale reading paler, opaquely, so text on it stays legible', () => {
+  it('draws a stale ramp reading as a white pill outlined in its ramp colour, opaque', () => {
     const paint = stationBadgePaint({ min: 0, max: 10, ...base })
 
     expect(paint?.['icon-opacity']).toBeUndefined()
-    expect(JSON.stringify(paint?.['icon-color'])).toContain('stale')
+    expect((paint?.['icon-color'] as unknown[])[2]).toBe('#ffffff')
+    expect(JSON.stringify(paint?.['icon-halo-color'])).toContain('interpolate')
+  })
+
+  it('always writes dark ink on a stale badge, which is white inside', () => {
+    const text = stationBadgePaint({ min: 3, max: 90, ...base }, 'pm25')?.['text-color']
+
+    expect((text as unknown[]).slice(0, 3)).toEqual(['case', ['get', 'stale'], '#12201f'])
+  })
+
+  it('draws a stale dot hollow, with a class-coloured ring', () => {
+    const paint = stationDotPaint({ min: 3, max: 90, ...base }, 'pm25')
+
+    expect((paint?.['circle-color'] as unknown[])[2]).toBe('#ffffff')
+    expect(paint?.['circle-stroke-width']).toEqual(['case', ['get', 'stale'], 3, 1.5])
+    expect((paint?.['circle-stroke-color'] as unknown[])[2]).toEqual(
+      (paint?.['circle-color'] as unknown[])[3],
+    )
   })
 
   it('writes white on the darkest class and dark ink on the others', () => {
@@ -278,6 +305,43 @@ describe('stationBadgePaint', () => {
 
     // ['case', stale, ink, ['case', ['>', value, 75], white, ink]]
     expect(fresh).toEqual(['case', ['>', ['get', 'value'], 75], '#ffffff', '#12201f'])
+  })
+})
+
+describe('stationBadgeLayout', () => {
+  const base = { unit: 'µg/m³', otherUnitCount: 0 }
+  const image = (range: Parameters<typeof stationBadgeLayout>[0], property: string | null) =>
+    stationBadgeLayout(range, property)?.['icon-image'] as unknown[]
+
+  it('picks the hollow badge of the reading’s class for a stale reading', () => {
+    const [, , stale, fresh] = image({ min: 3, max: 90, ...base }, 'pm25')
+
+    expect(fresh).toBe('station-badge')
+    expect(stale).toEqual([
+      'case',
+      ['<=', ['get', 'value'], 15],
+      staleBadgeImage('#ffffb2'),
+      ['<=', ['get', 'value'], 25],
+      staleBadgeImage('#fecc5c'),
+      ['<=', ['get', 'value'], 50],
+      staleBadgeImage('#fd8d3c'),
+      ['<=', ['get', 'value'], 75],
+      staleBadgeImage('#f03b20'),
+      staleBadgeImage('#bd0026'),
+    ])
+  })
+
+  it('names an image for every class colour, even when a pollutant skips one', () => {
+    const [, , stale] = image({ min: 3, max: 90, ...base }, 'no2')
+
+    expect(JSON.stringify(stale)).toContain(staleBadgeImage('#bd0026'))
+    expect(JSON.stringify(stale)).not.toContain(staleBadgeImage('#f03b20'))
+  })
+
+  it('falls back to the current pill, drawn white, where there are no classes', () => {
+    const [, , stale] = image({ min: 3, max: 90, ...base }, 'o3')
+
+    expect(stale).toBe('station-badge')
   })
 })
 

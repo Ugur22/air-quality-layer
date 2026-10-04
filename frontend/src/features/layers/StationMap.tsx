@@ -15,11 +15,13 @@ import {
   guidelineClasses,
   HAS_VALUE_FILTER,
   NO_VALUE_FILTER,
-  STATION_BADGE_LAYOUT,
+  STALE_DOT_FILTER,
+  STATION_DOT_EDGE_PAINT,
   STATION_DOT_LAYOUT,
   STATION_EMPTY_PAINT,
   STATION_EMPTY_SELECTED_PAINT,
   STATION_SELECTED_PAINT,
+  stationBadgeLayout,
   stationBadgePaint,
   stationDotPaint,
   valueRange,
@@ -192,13 +194,10 @@ function Legend({
         ) : null}
         <li>
           <span aria-hidden className="mt-0.5 grid place-items-center">
-            <span
-              className="size-3.5 rounded-full border border-ink/40"
-              style={{ background: 'color-mix(in srgb, #fd8d3c 38%, white)' }}
-            />
+            <span className="size-3.5 rounded-full border-[3px] border-[#fd8d3c] bg-white outline outline-1 outline-ink" />
           </span>
           <span>
-            <b>Pale badge</b> reading is 24 hours old or older.
+            <b>Hollow badge</b> reading is 24 hours old or older. Columns fade instead.
           </span>
         </li>
         <li>
@@ -314,6 +313,7 @@ export function StationMap({
     [visible, stations, property, now],
   )
   const range = useMemo(() => valueRange(stations, property), [stations, property])
+  const badgeLayout = useMemo(() => stationBadgeLayout(range, property), [range, property])
   const paint = useMemo(() => stationBadgePaint(range, property), [range, property])
   const dotPaint = useMemo(() => stationDotPaint(range, property), [range, property])
   const region = useMemo(() => (draftBbox ? outline(draftBbox) : EMPTY), [draftBbox])
@@ -551,6 +551,12 @@ export function StationMap({
                 paint={STATION_EMPTY_SELECTED_PAINT}
               />
               <Layer
+                id="stations-dot-edge"
+                type="circle"
+                filter={STALE_DOT_FILTER}
+                paint={STATION_DOT_EDGE_PAINT}
+              />
+              <Layer
                 id="stations-dot"
                 type="circle"
                 filter={HAS_VALUE_FILTER}
@@ -568,7 +574,7 @@ export function StationMap({
                   id="stations"
                   type="symbol"
                   filter={HAS_VALUE_FILTER}
-                  layout={STATION_BADGE_LAYOUT}
+                  layout={badgeLayout}
                   paint={paint}
                 />
               ) : null}

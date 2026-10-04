@@ -168,56 +168,45 @@ export function guidelineAxisMax(classes: GuidelineClass[], dataMax: number): nu
 
 const NO_FILL = 'rgba(0, 0, 0, 0)'
 
-/** Mixes a #rrggbb colour with white; an opaque stand-in for "faded" that keeps text legible. */
-function tint(hex: string, amount = 0.6): string {
-  const channel = (i: number) => {
-    const v = parseInt(hex.slice(1 + 2 * i, 3 + 2 * i), 16)
-    return Math.round(v + (255 - v) * amount)
-      .toString(16)
-      .padStart(2, '0')
-  }
-  return `#${channel(0)}${channel(1)}${channel(2)}`
-}
-
-function guidelineFill(property: string, unit: string, pale: boolean) {
+function guidelineFill(property: string, unit: string) {
   const classes = guidelineClasses(property, unit)
   if (classes === null) return null
   const last = classes[classes.length - 1]
   // `case` with `<=` keeps a value exactly on a boundary in the lower class; `step` would not.
-  const paint = (colour: string) => (pale ? tint(colour) : colour)
-  const branches = classes
-    .slice(0, -1)
-    .flatMap((c) => [['<=', ['get', 'value'], c.upTo], paint(c.colour)])
-  return ['case', ...branches, last === undefined ? NO_FILL : paint(last.colour)]
+  const branches = classes.slice(0, -1).flatMap((c) => [['<=', ['get', 'value'], c.upTo], c.colour])
+  return ['case', ...branches, last === undefined ? NO_FILL : last.colour]
 }
 
 /** The fill colour of a station with a value: its WHO class, or the layer-relative ramp. */
 export function stationFill(
   range: ValueRange | null,
   property: string | null = null,
-  pale = false,
-) {
-  const [low, mid, high] = (pale ? COLOUR_STOPS.map((c) => tint(c)) : COLOUR_STOPS) as [
-    string,
-    string,
-    string,
-  ]
+): ExpressionSpecification | string {
+  const [low, mid, high] = COLOUR_STOPS
   // Interpolation stops must strictly ascend. A range one float step wide would make the middle
   // stop equal to an end and invalidate the whole layer, so it counts as a single value.
   const middle = range === null ? 0 : (range.min + range.max) / 2
   const hasSpread = range !== null && range.min < middle && middle < range.max
-  const classed =
-    range === null || property === null ? null : guidelineFill(property, range.unit, pale)
+  const classed = range === null || property === null ? null : guidelineFill(property, range.unit)
   return (
-    classed ??
+    (classed as ExpressionSpecification | null) ??
     (hasSpread
-      ? ['interpolate', ['linear'], ['get', 'value'], range.min, low, middle, mid, range.max, high]
+      ? ([
+          'interpolate',
+          ['linear'],
+          ['get', 'value'],
+          range.min,
+          low,
+          middle,
+          mid,
+          range.max,
+          high,
+        ] as ExpressionSpecification)
       : mid)
   )
 }
 
 const INK = '#12201f'
-const STALE_BORDER = '#8a9a98'
 
 /**
  * Text on the darkest fill is white; everywhere else the dark ink reads better. Classes are cut at
@@ -237,20 +226,11 @@ function badgeTextColour(range: ValueRange | null, property: string | null) {
 
 /** Image registered on the map at load (see badgeImage.ts); stations with a value draw it. */
 export const BADGE_IMAGE = 'station-badge'
+/** The hollow badge of a stale reading, one image per class colour (see badgeImage.ts). */
+export const staleBadgeImage = (colour: string) => `station-badge-stale-${colour.slice(1)}`
+const STALE: ExpressionSpecification = ['get', 'stale']
 export const HAS_VALUE_FILTER: ExpressionSpecification = ['get', 'hasValue']
 export const NO_VALUE_FILTER: ExpressionSpecification = ['!', HAS_VALUE_FILTER]
-
-/** A stale reading is a paler tint of its colour, opaque so text on it stays legible. */
-function stationColour(range: ValueRange | null, property: string | null): ExpressionSpecification {
-  return [
-    'case',
-    ['get', 'stale'],
-    stationFill(range, property, true),
-    stationFill(range, property),
-  ] as ExpressionSpecification
-}
-
-const BORDER_COLOUR: ExpressionSpecification = ['case', ['get', 'stale'], STALE_BORDER, INK]
 
 /**
  * Badges do not overlap: where two collide, the one with the higher value keeps its place (symbols
@@ -269,16 +249,46 @@ export const STATION_BADGE_LAYOUT = {
   'symbol-sort-key': ['*', -1, ['get', 'value']],
 } as SymbolLayerSpecification['layout']
 
+/**
+ * The icon of a stale reading is its class's hollow badge. A pollutant without a class table has
+ * only a continuous ramp, which cannot be baked into an image, so there the current SDF pill is
+ * drawn white with the ramp colour as its outline (see stationBadgePaint).
+ */
+export function stationBadgeLayout(
+  range: ValueRange | null,
+  property: string | null = null,
+): SymbolLayerSpecification['layout'] {
+  const classes = range === null ? null : guidelineClasses(property, range.unit)
+  const last = classes?.at(-1)
+  const stale =
+    classes === null || last === undefined
+      ? BADGE_IMAGE
+      : [
+          'case',
+          ...classes
+            .slice(0, -1)
+            .flatMap((c) => [['<=', ['get', 'value'], c.upTo], staleBadgeImage(c.colour)]),
+          staleBadgeImage(last.colour),
+        ]
+  return {
+    ...STATION_BADGE_LAYOUT,
+    'icon-image': ['case', STALE, stale, BADGE_IMAGE],
+  } as SymbolLayerSpecification['layout']
+}
+
 export function stationBadgePaint(
   range: ValueRange | null,
   property: string | null = null,
 ): SymbolLayerSpecification['paint'] {
   return {
-    'icon-color': stationColour(range, property),
-    // The border is the SDF halo of the same pill, so it is placed or dropped with it.
-    'icon-halo-color': BORDER_COLOUR,
-    'icon-halo-width': 1.5,
-    'text-color': ['case', ['get', 'stale'], INK, badgeTextColour(range, property)],
+    // The border is the SDF halo of the same pill, so it is placed or dropped with it. A stale
+    // reading with a class table uses a baked image that ignores all three, so they only decide
+    // how a stale ramp reading looks: white inside, the ramp colour as the outline.
+    'icon-color': ['case', STALE, '#ffffff', stationFill(range, property)],
+    'icon-halo-color': ['case', STALE, stationFill(range, property), INK],
+    'icon-halo-width': ['case', STALE, 3, 1.5],
+    // A hollow badge is white inside, so its number is always dark.
+    'text-color': ['case', STALE, INK, badgeTextColour(range, property)],
   } as SymbolLayerSpecification['paint']
 }
 
@@ -296,11 +306,19 @@ export function stationDotPaint(
 ): CircleLayerSpecification['paint'] {
   return {
     'circle-radius': 6,
-    'circle-color': stationColour(range, property),
-    'circle-stroke-width': 1.5,
-    'circle-stroke-color': BORDER_COLOUR,
-  }
+    // A stale dot is hollow like its badge: white inside, a ring in the class colour.
+    'circle-color': ['case', STALE, '#ffffff', stationFill(range, property)],
+    'circle-stroke-width': ['case', STALE, 3, 1.5],
+    'circle-stroke-color': ['case', STALE, stationFill(range, property), INK],
+  } as CircleLayerSpecification['paint']
 }
+
+/** The ink edge of a stale dot: its class-coloured ring is too pale on the basemap to hold the dot. */
+export const STALE_DOT_FILTER: ExpressionSpecification = ['all', HAS_VALUE_FILTER, STALE]
+export const STATION_DOT_EDGE_PAINT = {
+  'circle-radius': 8.25,
+  'circle-color': INK,
+} as CircleLayerSpecification['paint']
 
 const SELECTED_STROKE = {
   'circle-color': 'rgba(0, 0, 0, 0)',

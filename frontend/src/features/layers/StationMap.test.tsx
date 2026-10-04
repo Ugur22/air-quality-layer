@@ -210,10 +210,10 @@ describe('StationMap', () => {
 
     const toggle = screen.getByRole('button', { name: /marker guide/i })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText(/pale badge/i)).not.toBeVisible()
+    expect(screen.queryByText(/hollow badge/i)).not.toBeVisible()
     await user.click(toggle)
     expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText(/pale badge/i)).toBeVisible()
+    expect(screen.getByText(/hollow badge/i)).toBeVisible()
   })
 
   it('draws the outline of the box in the form', () => {
@@ -384,7 +384,7 @@ describe('StationMap', () => {
     expect(screen.getByRole('tooltip')).toHaveTextContent('o3 not reported')
   })
 
-  it('explains the colours: WHO classes with the unit, pale means stale, grey dot means no value', () => {
+  it('explains the colours: WHO classes with the unit, hollow means stale, grey dot means no value', () => {
     render(
       <StationMap
         layer={layer}
@@ -403,7 +403,7 @@ describe('StationMap', () => {
     expect(legend).toHaveTextContent('> 75')
     expect(legend).toHaveTextContent('µg/m³')
     expect(legend).not.toHaveTextContent(/relative to this layer/i)
-    expect(legend).toHaveTextContent(/pale badge/i)
+    expect(legend).toHaveTextContent(/hollow badge/i)
     expect(legend).toHaveTextContent(/grey dot/i)
   })
 
