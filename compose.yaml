@@ -45,7 +45,13 @@ services:
 
   worker:
     <<: *backend
-    command: procrastinate --app=airlayer.jobs.app worker
+    command: procrastinate --app=airlayer.jobs.app worker --queues default
+
+  # The hourly national refresh takes about nine minutes (ADR 0018); on the shared worker it would
+  # hold up region syncs and let the reaper time them out.
+  worker-national:
+    <<: *backend
+    command: procrastinate --app=airlayer.jobs.app worker --queues national --name national
 
 volumes:
   pgdata:

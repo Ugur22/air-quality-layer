@@ -24,7 +24,7 @@ A region is one box of at most 2 degrees, pulled live by a user-triggered sync (
 
 ## Consequences
 - New migration: `national_refreshes`; `station_readings.sync_job_id` becomes nullable and `national_refresh_id` is added, with a check that exactly one of the two is set.
-- A refresh takes about ten minutes (roughly 380 paced calls). The worker handles one job at a time (`procrastinate worker` default), so a running refresh delays region syncs unless the worker gets more concurrency; that is a Compose change and not made here.
+- A refresh takes about nine minutes (roughly 380 paced calls). It runs on its own `national` queue, served by its own worker service (`worker-national` in Compose), so it cannot hold up region syncs or let the reaper time them out; the original worker listens to the `default` queue only.
 - The refresh shares the process-wide Luchtmeetnet pacer with syncs (ADR 0017), so a sync that overlaps a refresh waits longer on that source.
 - ADR 0002's "user-triggered sync only" and the "scheduled or recurring sync" out-of-scope line are narrowed: regions stay user-triggered, the national layer is scheduled.
 - Stale stations stay in the layer with their old `observed_at`, as in a region layer.
