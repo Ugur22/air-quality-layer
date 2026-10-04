@@ -134,12 +134,14 @@ export function StationDialog({
               aria-labelledby="station-tab-overview"
               hidden={tab !== 'overview'}
             >
-              <StationOverview
-                station={station}
-                stations={stations}
-                property={property}
-                now={now}
-              />
+              {tab === 'overview' ? (
+                <StationOverview
+                  station={station}
+                  stations={stations}
+                  property={property}
+                  now={now}
+                />
+              ) : null}
             </div>
             <div
               role="tabpanel"
@@ -147,12 +149,15 @@ export function StationDialog({
               aria-labelledby="station-tab-trend"
               hidden={tab !== 'trend'}
             >
-              <StationTrend
-                layerId={layerId}
-                stationId={station.id}
-                property={property}
-                active={tab === 'trend'}
-              />
+              {tab === 'trend' ? (
+                <StationTrend
+                  layerId={layerId}
+                  stationId={station.id}
+                  property={property}
+                  active={tab === 'trend'}
+                  lastReported={newest ? formatAge(newest, now) : null}
+                />
+              ) : null}
             </div>
           </div>
         </Dialog.Content>

@@ -45,11 +45,13 @@ export function StationTrend({
   stationId,
   property,
   active,
+  lastReported,
 }: {
   layerId: string
   stationId: string
   property: string | null
   active: boolean
+  lastReported: string | null
 }) {
   const history = useStationHistory(layerId, stationId, property, active)
 
@@ -58,9 +60,12 @@ export function StationTrend({
   }
   if (history.isPending) {
     return (
-      <p role="status" className="text-sm text-muted">
-        Loading the last {HISTORY_HOURS} hours…
-      </p>
+      // Same height as the chart, so the dialog does not jump when the data arrives.
+      <div className="grid h-80 w-full animate-pulse place-items-center rounded-lg bg-line/40 motion-reduce:animate-none">
+        <p role="status" className="text-sm text-muted">
+          Loading the last {HISTORY_HOURS} hours…
+        </p>
+      </div>
     )
   }
   if (history.isError) {
@@ -89,7 +94,7 @@ export function StationTrend({
       <p className="text-sm text-muted">
         {unit === null
           ? `This station has no ${property} sensor.`
-          : `No ${property} readings in the last ${String(HISTORY_HOURS)} hours. The station may have stopped reporting.`}
+          : `No ${property} readings in the last ${String(HISTORY_HOURS)} hours.${lastReported ? ` This station last reported ${lastReported}.` : ' The station may have stopped reporting.'}`}
       </p>
     )
   }

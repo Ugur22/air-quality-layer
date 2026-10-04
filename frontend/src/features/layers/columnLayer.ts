@@ -103,7 +103,9 @@ export function buildColumnLayers({ data, range, property, bbox, selectedId }: C
       radius: radius * 1.7,
       diskResolution: 24,
       extruded: true,
-      getElevation: (s) => (s.properties.value ?? 0) * heightScale,
+      // Lower than the station's own column, so the halo reads as a collar and the column keeps
+      // its class colour instead of being painted over.
+      getElevation: (s) => (s.properties.value ?? 0) * heightScale * 0.8,
       getFillColor: SELECTED_FILL,
       material: false,
     }),
