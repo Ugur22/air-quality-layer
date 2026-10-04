@@ -98,3 +98,56 @@ def test_models_match_the_migrations(migration_db: None) -> None:
 
     # Fails when a model changes without a migration (or the reverse).
     alembic("check")
+
+
+def test_readings_stored_before_the_second_source_read_as_openaq_and_a_downgrade_keeps_the_rest(
+    migration_db: None,
+) -> None:
+    alembic("upgrade", "0003")
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        org, project = conn.execute("SELECT organisation_id, id FROM projects").fetchone() or (
+            None,
+            None,
+        )
+        conn.execute(
+            "INSERT INTO regions (id, project_id, organisation_id, name, geom) VALUES "
+            "('00000000-0000-4000-8000-0000000000c1', %s, %s, 'r', "
+            "ST_MakeEnvelope(4.85, 52.35, 4.95, 52.40, 4326))",
+            (project, org),
+        )
+        conn.execute(
+            "INSERT INTO sync_jobs (id, organisation_id, region_id, status) VALUES "
+            "('00000000-0000-4000-8000-0000000000d1', %s, "
+            "'00000000-0000-4000-8000-0000000000c1', 'succeeded')",
+            (org,),
+        )
+        conn.execute(
+            "INSERT INTO station_readings (id, sync_job_id, openaq_location_id, name, geom, "
+            "readings) VALUES ('00000000-0000-4000-8000-0000000000e1', "
+            "'00000000-0000-4000-8000-0000000000d1', 7, 'Old', "
+            "ST_SetSRID(ST_MakePoint(4.9, 52.37), 4326), '{}'::jsonb)"
+        )
+
+    alembic("upgrade", "head")
+
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        row = conn.execute("SELECT sources, luchtmeetnet_number FROM station_readings").fetchone()
+        assert row == (["openaq"], None)
+        conn.execute(
+            "INSERT INTO station_readings (id, sync_job_id, luchtmeetnet_number, name, geom, "
+            "readings) VALUES ('00000000-0000-4000-8000-0000000000e2', "
+            "'00000000-0000-4000-8000-0000000000d1', 'NL1', 'New', "
+            "ST_SetSRID(ST_MakePoint(4.9, 52.37), 4326), '{}'::jsonb)"
+        )
+
+    # Rows only Luchtmeetnet knows have no OpenAQ id, so a downgrade stops instead of losing them.
+    with pytest.raises(subprocess.CalledProcessError):
+        alembic("downgrade", "0003")
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        count = conn.execute("SELECT count(*) FROM station_readings").fetchone()
+        conn.execute("DELETE FROM station_readings WHERE luchtmeetnet_number IS NOT NULL")
+    assert count == (2,)
+
+    alembic("downgrade", "0003")
+    with psycopg.connect(MIGRATION_URL) as conn:
+        assert conn.execute("SELECT openaq_location_id FROM station_readings").fetchall() == [(7,)]

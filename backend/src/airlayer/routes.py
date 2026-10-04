@@ -1,4 +1,5 @@
 import logging
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query
@@ -211,6 +212,17 @@ async def get_station_history(
         )
     # Ends the read transaction, so the pooled connection is not held through two OpenAQ calls.
     await session.rollback()
+    if target.openaq_location_id is None:
+        now = datetime.now(UTC).replace(microsecond=0)
+        return HistoryResponse(
+            history=HistoryOut(
+                property=property,
+                unit=None,
+                from_=now - timedelta(hours=hours),
+                to=now,
+                points=[],
+            )
+        )
     result, start, end = await provider.history(target.openaq_location_id, property, hours)
     return HistoryResponse(
         history=HistoryOut(

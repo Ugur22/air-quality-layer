@@ -88,7 +88,8 @@ Notes:
     "finished_at": "…",
     "station_count": null,
     "map_layer_id": null,
-    "errors": [ { "code": "upstream_unavailable", "message": "…" } ]
+    "errors": [ { "code": "upstream_unavailable", "message": "…" } ],
+    "warnings": []
   }
 }
 ```
@@ -98,6 +99,7 @@ Notes:
 - `station_count` and `map_layer_id` are non-null only when `succeeded`; `errors` is non-empty only when `failed`. `map_layer_id` equals the sync job's own `id` (the layer is derived from the job, Decided, ADR 0010).
 - Sync error codes (clients branch on `code`; unknown codes must render safely): `upstream_unavailable` (OpenAQ unreachable, `429` or `5xx` after retries), `upstream_unauthorized` (OpenAQ rejected the key, or no key configured; not retried), `upstream_invalid_response` (malformed body or other non-retryable `4xx`), `too_many_stations` (bbox matches more than the 50-station cap, Decided, ADR 0010), `timed_out` (a job abandoned by a dead worker or a lost enqueue, or one whose OpenAQ calls ran past half the 10-minute timeout), `processing_error`.
 - A well-formed OpenAQ response with zero stations is `succeeded` with `station_count: 0` (Decided, ADR 0010); `no_stations_in_region` no longer exists.
+- `warnings` (additive, Proposed, ADR 0017) is non-empty only on a `succeeded` job that is missing part of its data: `{ "code": "luchtmeetnet_unavailable", "message": "…" }` means Luchtmeetnet could not be reached or answered something unusable, and the layer holds OpenAQ's stations only. OpenAQ failing is still `failed`. Unknown codes must render safely.
 - A job still `queued` or `processing` after 10 minutes (a starting value, `AIRLAYER_SYNC_TIMEOUT_MINUTES`) is failed with `timed_out` by a once-a-minute background task.
 - Errors: `404 not_found` (unknown id, another organisation's job, or a malformed id), `400 validation_failed` (malformed `X-Dev-Organisation-Id`), `401 unauthorized` (outside development).
 
@@ -124,17 +126,19 @@ Notes:
 - Each feature's `properties` (Decided, ADR 0010):
 
   ```json
-  { "name": "…", "readings": { "pm25": { "value": 12.4, "unit": "µg/m³", "observed_at": "…" } } }
+  { "name": "…", "sources": ["openaq", "luchtmeetnet"], "readings": { "pm25": { "value": 12.4, "unit": "µg/m³", "observed_at": "…", "source": "luchtmeetnet" } } }
   ```
 
-  `readings` holds the latest value per parameter OpenAQ returned; `value` is a number. A value at or below `-990`, which OpenAQ sends as a marker where a sensor has no measurement (`-999`, `-998` and `-995` were seen in real responses), is dropped instead of stored, and a layer stored before this rule is read without such values; values above `-990`, including small negatives, are kept (Decided, ADR 0014; the threshold is a starting value). Readings are not filtered by age: a station that stopped reporting keeps its old `observed_at`, so clients can show how stale it is. The filter below compares against `readings.<property>.value`.
+  `sources` and each reading's `source` (`openaq` or `luchtmeetnet`) are additive (Proposed, ADR 0017). A station within 50 m of another source's station is one feature: its `sources` lists both, and each pollutant carries the newer of the two readings (Luchtmeetnet on a tie), only when both report the same unit. Luchtmeetnet adds pollutants OpenAQ lacks (`fn` soot, `bcwb` black carbon from wood burning, `ps` ultrafine particles, `c6h6` benzene and others); their units come from a fixed table (Assumption, ADR 0017).
+
+  `readings` holds the latest value per parameter the sources returned; `value` is a number. A value at or below `-990`, which OpenAQ sends as a marker where a sensor has no measurement (`-999`, `-998` and `-995` were seen in real responses), is dropped instead of stored, and a layer stored before this rule is read without such values; values above `-990`, including small negatives, are kept (Decided, ADR 0014; the threshold is a starting value). Readings are not filtered by age: a station that stopped reporting keeps its old `observed_at`, so clients can show how stale it is. The filter below compares against `readings.<property>.value`.
 
 - Coordinates are `[longitude, latitude]` in WGS84, matching Layerline's convention (Decided).
 - Each feature's `id` is the stored station reading's own id (Decided, for stable client-side matching across a filtered and unfiltered request, same guarantee as Layerline).
 - Optional filter: `?property=<key>&value=<number>&comparator=<op>`. `property` and `value` are given together or not at all, and `comparator` needs both (`400 validation_failed` otherwise). `comparator` is one of `=`, `>`, `>=`, `<`, `<=` (default `=`). `value` must match `-?[0-9]+(\.[0-9]+)?` (ASCII digits, no exponent or leading `+`) and be finite, because readings are numeric; this replaces the Layerline text-value grammar. `property` must be one of the layer's `property_keys`, otherwise `400 validation_failed` (the message lists the valid keys). A station that lacks an otherwise-valid property is excluded from the match, not an error. The filter compares against `readings.<property>.value` exactly: `=` matches only the stored number (12.4), not a rounded display of it (12.37 shown as 12.4). Order of checks: a malformed id is `404`; then the filter syntax (`400`); then the layer lookup (`404` for an unknown, foreign or unfinished layer, before the property is checked against `property_keys`, so another organisation never sees a layer's keys). Repeating a query parameter uses the last value.
 - `property_keys`: distinct pollutant parameter names across the layer's stations, sorted. Units are on each reading, not here.
 - `station_count` and `property_keys` describe the whole layer, not the filtered subset, so a filter UI stays stable while the filter changes; the number of matches is the length of `features`.
-- `bbox` is the region's bounding box. Features are ordered by OpenAQ location id.
+- `bbox` is the region's bounding box. Features are ordered by OpenAQ location id, stations only Luchtmeetnet has coming last (by their Luchtmeetnet number).
 - Size: the layer is returned inline; the 50-station cap bounds it, which is why there is no pagination (first-slice-only).
 - Errors: `400 validation_failed` (bad filter, malformed `X-Dev-Organisation-Id`), `404 not_found` (unknown id, another organisation's, not a succeeded job, or a malformed id), `401 unauthorized` (outside development).
 
@@ -211,7 +215,7 @@ Hourly values of one pollutant at one station, fetched from OpenAQ when the requ
 ```
 
 - `station_id` is the `id` of a feature of that map layer (section 4). `map_layer_id` and `station_id` outside the caller's organisation, unknown, or not a succeeded job's layer are `404 not_found`; a malformed id is also `404`.
-- `property` is required and must be one of the layer's `property_keys` (`400 validation_failed` otherwise; the message lists the keys). A station that does not report that property, or has no sensor for it, returns `points: []` and `unit: null`.
+- `property` is required and must be one of the layer's `property_keys` (`400 validation_failed` otherwise; the message lists the keys). A station that does not report that property, has no sensor for it, or is only known to Luchtmeetnet (no OpenAQ location, ADR 0017) returns `points: []` and `unit: null`.
 - `hours` is a whole number from 1 to 168, default 24 (`400 validation_failed` otherwise). `from` is the start of the window and `to` its end, both UTC: the moment the data was fetched from OpenAQ, which is up to 5 minutes earlier when the answer comes from the cache.
 - `at` is the end of the hour a value covers (OpenAQ `period.datetimeTo`). Points are ordered oldest first, one per hour at most, and values at or below `-990` are left out (section 4). A gap in the data is a missing point, never a zero.
 - `unit` is the unit OpenAQ reports for the sensor; it is `null` only when the station has no sensor for the property.

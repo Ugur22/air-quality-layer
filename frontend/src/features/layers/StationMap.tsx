@@ -1,5 +1,6 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
-import { SquareDashedMousePointer } from 'lucide-react'
+import type { MapboxOverlay } from '@deck.gl/mapbox'
+import { Box, SquareDashedMousePointer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layer, Map, NavigationControl, Source, type MapRef } from 'react-map-gl/maplibre'
 import type { Bbox } from '@/features/regions/types'
@@ -22,6 +23,8 @@ import {
   valueRange,
 } from './mapData'
 import { addBadgeImage } from './badgeImage'
+import { buildColumnLayers, COLUMN_PITCH } from './columnLayer'
+import { ColumnOverlay } from './ColumnOverlay'
 import { startRectangleDrawing } from './regionDrawing'
 import { StationTooltip } from './StationTooltip'
 import type { MapLayerResponse } from './types'
@@ -189,6 +192,8 @@ export function StationMap({
   viewRequest?: { bbox: Bbox; id: number } | null
 }) {
   const mapRef = useRef<MapRef>(null)
+  const overlayRef = useRef<MapboxOverlay>(null)
+  const [columns, setColumns] = useState(false)
   const [pointer, setPointer] = useState(false)
   // The station under the pointer and where, for the tooltip.
   const [hover, setHover] = useState<{
@@ -226,6 +231,24 @@ export function StationMap({
     () => (layerBbox && showSyncedBox ? outline(layerBbox) : EMPTY),
     [layerBbox, showSyncedBox],
   )
+  const columnLayers = useMemo(
+    () =>
+      columns && layerBbox
+        ? buildColumnLayers({ data, range, property, bbox: layerBbox, selectedId })
+        : [],
+    [columns, data, range, property, layerBbox, selectedId],
+  )
+  /** The id of the station under a screen point: the style's layers, or deck.gl's columns. */
+  const stationAt = (event: {
+    point: { x: number; y: number }
+    features?: { properties: Record<string, unknown> }[]
+  }) => {
+    if (!columns) return event.features?.[0]?.properties.id
+    const picked = overlayRef.current?.pickObject({ x: event.point.x, y: event.point.y, radius: 4 })
+    const props: unknown = (picked?.object as { properties?: { id?: unknown } } | undefined)
+      ?.properties
+    return (props as { id?: unknown } | undefined)?.id
+  }
   const hovered = hover === null ? undefined : visible.find((s) => s.id === hover.id)
 
   // initialViewState frames the first view. When a sync finishes (or another one replaces it) the
@@ -318,7 +341,7 @@ export function StationMap({
               ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING_BOX } }
               : { bounds: NETHERLANDS_BOUNDS, fitBoundsOptions: { padding: 16 } }
           }
-          interactiveLayerIds={['stations', 'stations-dot', 'stations-empty']}
+          interactiveLayerIds={columns ? [] : ['stations', 'stations-dot', 'stations-empty']}
           onLoad={(event) => {
             addBadgeImage(event.target)
             setBadgeReady(true)
@@ -328,8 +351,9 @@ export function StationMap({
             setPointer(true)
           }}
           onMouseMove={(event) => {
-            const id: unknown = event.features?.[0]?.properties.id
+            const id = stationAt(event)
             const { x, y } = event.point
+            if (columns) setPointer(typeof id === 'string')
             // Near the right or bottom edge the tooltip goes to the other side of the pointer.
             const width = frame.current?.clientWidth ?? 0
             const height = frame.current?.clientHeight ?? 0
@@ -353,7 +377,7 @@ export function StationMap({
             // A drag in drawing mode must not select (or deselect) a station.
             if (drawing) return
             setHover(null)
-            const id: unknown = event.features?.[0]?.properties.id
+            const id = stationAt(event)
             onSelect(typeof id === 'string' ? id : null)
           }}
         >
@@ -379,44 +403,64 @@ export function StationMap({
               />
             </Source>
           ) : null}
-          <Source id="stations" type="geojson" data={data}>
-            <Layer
-              id="stations-selected"
-              type="circle"
-              filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
-              paint={STATION_SELECTED_PAINT}
-            />
-            <Layer
-              id="stations-empty-selected"
-              type="circle"
-              filter={['all', NO_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
-              paint={STATION_EMPTY_SELECTED_PAINT}
-            />
-            <Layer
-              id="stations-dot"
-              type="circle"
-              filter={HAS_VALUE_FILTER}
-              layout={STATION_DOT_LAYOUT}
-              paint={dotPaint}
-            />
-            <Layer
-              id="stations-empty"
-              type="circle"
-              filter={NO_VALUE_FILTER}
-              paint={STATION_EMPTY_PAINT}
-            />
-            {badgeReady ? (
+          {columns ? <ColumnOverlay layers={columnLayers} overlayRef={overlayRef} /> : null}
+          {columns ? null : (
+            <Source id="stations" type="geojson" data={data}>
               <Layer
-                id="stations"
-                type="symbol"
-                filter={HAS_VALUE_FILTER}
-                layout={STATION_BADGE_LAYOUT}
-                paint={paint}
+                id="stations-selected"
+                type="circle"
+                filter={['all', HAS_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
+                paint={STATION_SELECTED_PAINT}
               />
-            ) : null}
-          </Source>
+              <Layer
+                id="stations-empty-selected"
+                type="circle"
+                filter={['all', NO_VALUE_FILTER, ['==', ['get', 'id'], selectedId ?? '']]}
+                paint={STATION_EMPTY_SELECTED_PAINT}
+              />
+              <Layer
+                id="stations-dot"
+                type="circle"
+                filter={HAS_VALUE_FILTER}
+                layout={STATION_DOT_LAYOUT}
+                paint={dotPaint}
+              />
+              <Layer
+                id="stations-empty"
+                type="circle"
+                filter={NO_VALUE_FILTER}
+                paint={STATION_EMPTY_PAINT}
+              />
+              {badgeReady ? (
+                <Layer
+                  id="stations"
+                  type="symbol"
+                  filter={HAS_VALUE_FILTER}
+                  layout={STATION_BADGE_LAYOUT}
+                  paint={paint}
+                />
+              ) : null}
+            </Source>
+          )}
         </Map>
       </div>
+      {layer && range ? (
+        <Button
+          type="button"
+          size="sm"
+          variant={columns ? 'default' : 'outline'}
+          className="absolute right-3 top-24 z-10"
+          aria-pressed={columns}
+          onClick={() => {
+            mapRef.current?.easeTo({ pitch: columns ? 0 : COLUMN_PITCH, duration: 600 })
+            setHover(null)
+            setColumns((on) => !on)
+          }}
+        >
+          <Box className="size-4" aria-hidden />
+          Columns
+        </Button>
+      ) : null}
       {hovered && hover ? (
         <StationTooltip
           station={hovered}

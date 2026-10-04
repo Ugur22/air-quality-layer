@@ -18,6 +18,12 @@ class Settings(BaseSettings):
     max_sync_retries: int = 3
     openaq_base_url: str = "https://api.openaq.org/v3"
     openaq_timeout_seconds: float = 20.0
+    # Luchtmeetnet (ADR 0017): no key, fair use, 100 calls per 5 minutes.
+    luchtmeetnet_base_url: str = "https://api.luchtmeetnet.nl/open_api"
+    luchtmeetnet_timeout_seconds: float = 20.0
+    # All Luchtmeetnet calls of one sync together; past it the sync goes on without them. Added to
+    # OpenAQ's half of the sync timeout this stays under the whole timeout (ADR 0017).
+    luchtmeetnet_budget_seconds: float = 120.0
     # Place search (ADR 0013): Photon, a public OpenStreetMap geocoder with no key. It asks for
     # fair use, so the app identifies itself and limits its own calls; both are starting values.
     places_base_url: str = "https://photon.komoot.io"

@@ -9,6 +9,7 @@ import { useSession } from '@/stores/session'
 import { useFilteredMapLayer } from './api'
 import { parseFilterValue, type LayerFilter } from './filter'
 import { FILTER_DEBOUNCE_MS } from './filterTiming'
+import { pollutantLabel } from './pollutants'
 import { LayerFilterControls } from './LayerFilterControls'
 import { pickColourProperty, valueRange } from './mapData'
 import { StationDialog } from './StationDialog'
@@ -209,7 +210,7 @@ export function ResultPanel({
               >
                 {keys.map((key) => (
                   <option key={key} value={key}>
-                    {key}
+                    {pollutantLabel(key)}
                   </option>
                 ))}
               </select>

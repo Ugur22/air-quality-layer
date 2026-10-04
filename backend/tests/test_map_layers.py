@@ -126,11 +126,23 @@ async def test_layer_is_a_geojson_feature_collection_with_the_documented_shape(
     UUID(low["id"])
     # [longitude, latitude], not [latitude, longitude]
     assert low["geometry"] == {"type": "Point", "coordinates": [4.86, 52.36]}
+    # A layer stored before there was a second source reads as OpenAQ's (ADR 0017).
     assert low["properties"] == {
         "name": "Low",
+        "sources": ["openaq"],
         "readings": {
-            "no2": {"value": 20.0, "unit": "µg/m³", "observed_at": "2026-10-03T08:00:00Z"},
-            "pm25": {"value": 4.2, "unit": "µg/m³", "observed_at": "2026-10-03T08:00:00Z"},
+            "no2": {
+                "value": 20.0,
+                "unit": "µg/m³",
+                "observed_at": "2026-10-03T08:00:00Z",
+                "source": "openaq",
+            },
+            "pm25": {
+                "value": 4.2,
+                "unit": "µg/m³",
+                "observed_at": "2026-10-03T08:00:00Z",
+                "source": "openaq",
+            },
         },
     }
 
@@ -370,3 +382,83 @@ async def test_a_filter_does_not_match_a_stored_marker_value(
     response = await get_layer(client, layer, {"property": "pm25", "comparator": "<", "value": "5"})
 
     assert names(response.json()) == ["B"]
+
+
+def add_luchtmeetnet_station(layer: Layer, number: str, name: str = "Only Luchtmeetnet") -> None:
+    readings = reading(0.09) | {"source": "luchtmeetnet"}
+    with psycopg.connect(TEST_URL, autocommit=True) as conn:
+        conn.execute(
+            "INSERT INTO station_readings "
+            "(id, sync_job_id, luchtmeetnet_number, sources, name, geom, readings) VALUES "
+            "(%s, %s, %s, %s::jsonb, %s, ST_SetSRID(ST_MakePoint(4.87, 52.37), 4326), %s::jsonb)",
+            (
+                uuid4(),
+                layer.job_id,
+                number,
+                psycopg.types.json.Jsonb(["luchtmeetnet"]),
+                name,
+                psycopg.types.json.Jsonb({"bcwb": readings}),
+            ),
+        )
+
+
+async def test_a_station_only_luchtmeetnet_has_is_served_last_with_its_source_and_pollutants(
+    client: AsyncClient, make_layer: Callable[..., Layer]
+) -> None:
+    layer = make_layer()
+    add_luchtmeetnet_station(layer, "NL2")
+    add_luchtmeetnet_station(layer, "NL1", name="Also Luchtmeetnet")
+
+    body = (await get_layer(client, layer)).json()
+
+    assert names(body) == ["Low", "Mid", "High", "NoPm", "Also Luchtmeetnet", "Only Luchtmeetnet"]
+    last = body["stations"]["features"][-1]["properties"]
+    assert last["sources"] == ["luchtmeetnet"]
+    assert last["readings"]["bcwb"]["source"] == "luchtmeetnet"
+    assert body["map_layer"]["property_keys"] == ["bcwb", "no2", "pm25"]
+
+
+async def test_the_filter_works_on_a_pollutant_only_luchtmeetnet_reports(
+    client: AsyncClient, make_layer: Callable[..., Layer]
+) -> None:
+    layer = make_layer()
+    add_luchtmeetnet_station(layer, "NL1")
+
+    body = (
+        await get_layer(client, layer, {"property": "bcwb", "value": "0.05", "comparator": ">"})
+    ).json()
+
+    assert names(body) == ["Only Luchtmeetnet"]
+
+
+def test_a_station_reading_needs_at_least_one_source_id(
+    make_layer: Callable[..., Layer],
+) -> None:
+    layer = make_layer()
+
+    with (
+        psycopg.connect(TEST_URL, autocommit=True) as conn,
+        pytest.raises(psycopg.errors.CheckViolation),
+    ):
+        conn.execute(
+            "INSERT INTO station_readings (id, sync_job_id, name, geom, readings) VALUES "
+            "(%s, %s, 'nobody', ST_SetSRID(ST_MakePoint(4.9, 52.37), 4326), '{}'::jsonb)",
+            (uuid4(), layer.job_id),
+        )
+
+
+async def test_a_warning_on_a_succeeded_sync_reaches_the_client(
+    client: AsyncClient, make_layer: Callable[..., Layer]
+) -> None:
+    layer = make_layer()
+    warning = {"code": "luchtmeetnet_unavailable", "message": "Luchtmeetnet could not be used."}
+    with psycopg.connect(TEST_URL, autocommit=True) as conn:
+        conn.execute(
+            "UPDATE sync_jobs SET warnings = %s::jsonb WHERE id = %s",
+            (psycopg.types.json.Jsonb([warning]), layer.job_id),
+        )
+
+    response = await client.get(f"/api/v1/syncs/{layer.job_id}", headers=layer.tenant.headers)
+
+    job = response.json()["sync_job"]
+    assert (job["status"], job["errors"], job["warnings"]) == ("succeeded", [], [warning])

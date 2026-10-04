@@ -61,6 +61,15 @@ describe('ResultPanel', () => {
     )
   })
 
+  it('names each pollutant in the selector while keeping its key as the value', () => {
+    mockApi({})
+
+    panel()
+
+    expect(screen.getByRole('option', { name: 'PM2.5 (pm25)' })).toHaveValue('pm25')
+    expect(screen.getByRole('option', { name: 'Nitrogen dioxide (no2)' })).toHaveValue('no2')
+  })
+
   it('ignores a remembered pollutant the layer does not have', () => {
     mockApi({})
     useSession.getState().setColourProperty('o3')

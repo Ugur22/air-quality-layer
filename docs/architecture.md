@@ -8,6 +8,7 @@ Nothing beyond the scaffold is implemented yet. Status labels: **Decided** (acce
 |---|---|---|
 | Repo layout and tooling | Decided ([0001](decisions/0001-repo-layout-and-tooling.md)) | One repo, independent `frontend/` and `backend/` packages; no monorepo tool. Frontend: Vite, React, strict TypeScript, npm, Vitest, ESLint + Prettier. Backend: Python 3.12+, uv, Ruff, mypy, pytest, Alembic |
 | Data source and ingestion | Decided ([0002](decisions/0002-data-source-and-ingestion.md)) | OpenAQ v3 as the only data source; Procrastinate (Postgres-backed) worker pulls on user-triggered sync, with retries for transient failures only |
+| Second data source | Proposed ([0017](decisions/0017-luchtmeetnet-as-second-source.md)) | Luchtmeetnet (Dutch national network, no key) merged with OpenAQ by the worker at sync time: stations within 50 m are one; Luchtmeetnet failure gives a succeeded job with a warning |
 | UI toolkit | Decided ([0004](decisions/0004-frontend-ui-toolkit.md)) | Tailwind CSS + shadcn/ui (Radix) |
 | Client state and data | Decided ([0005](decisions/0005-client-state-and-data-fetching.md)) | TanStack Query (server state), Zustand (UI state), ts-pattern for exhaustive matching |
 | Map | Decided ([0006](decisions/0006-map-stack.md), [0008](decisions/0008-basemap-tile-source.md)) | MapLibre GL via `react-map-gl`; basemap style URL from config |

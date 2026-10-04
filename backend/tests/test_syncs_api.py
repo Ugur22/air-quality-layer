@@ -27,6 +27,7 @@ SYNC_KEYS = {
     "station_count",
     "map_layer_id",
     "errors",
+    "warnings",
 }
 
 
@@ -75,6 +76,7 @@ async def test_starting_a_sync_returns_202_a_queued_job_and_enqueues_it(
     assert job["station_count"] is None
     assert job["map_layer_id"] is None
     assert job["errors"] == []
+    assert job["warnings"] == []
     assert queued_task_args(job["id"]) == [{"sync_job_id": job["id"]}]
 
 
@@ -241,6 +243,7 @@ async def test_whole_flow_through_the_api_and_the_real_worker(
     assert done["station_count"] == 2
     assert done["map_layer_id"] == job["id"]
     assert done["errors"] == []
+    assert done["warnings"] == []
     assert done["started_at"] is not None
     assert done["finished_at"] is not None
 

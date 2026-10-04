@@ -189,6 +189,7 @@ def _sync_job_out(job: SyncJob) -> SyncJobOut:
         station_count=job.station_count,
         map_layer_id=job.id if job.status == SyncStatus.SUCCEEDED.value else None,
         errors=[SyncError(**e) for e in job.errors],
+        warnings=[SyncError(**w) for w in job.warnings],
     )
 
 
@@ -294,9 +295,14 @@ async def get_map_layer(
                 func.ST_X(StationReading.geom).label("lon"),
                 func.ST_Y(StationReading.geom).label("lat"),
                 StationReading.readings,
+                StationReading.sources,
             )
             .where(StationReading.sync_job_id == job.id)
-            .order_by(StationReading.openaq_location_id)
+            .order_by(
+                StationReading.openaq_location_id.asc().nulls_last(),
+                StationReading.luchtmeetnet_number,
+                StationReading.id,
+            )
         )
     ).all()
     # A layer stored before markers were dropped at sync time still holds them (ADR 0014).
@@ -313,7 +319,9 @@ async def get_map_layer(
             id=r.id,
             geometry=PointGeometry(coordinates=[r.lon, r.lat]),
             properties=StationProperties(
-                name=r.name, readings={k: ReadingOut(**v) for k, v in readings.items()}
+                name=r.name,
+                sources=r.sources,
+                readings={k: ReadingOut(**v) for k, v in readings.items()},
             ),
         )
         for r, readings in cleaned
@@ -333,7 +341,8 @@ async def get_map_layer(
 
 @dataclass(frozen=True)
 class HistoryTarget:
-    openaq_location_id: int
+    # None for a station only Luchtmeetnet has: it has no history here (ADR 0017).
+    openaq_location_id: int | None
     property_keys: list[str]
 
 

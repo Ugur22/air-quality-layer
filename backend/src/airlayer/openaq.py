@@ -52,6 +52,8 @@ class Reading:
     value: float
     unit: str
     observed_at: datetime
+    # Which source this value came from (ADR 0017).
+    source: str = "openaq"
 
 
 @dataclass(frozen=True)
@@ -68,11 +70,14 @@ class StationHistory:
 
 @dataclass(frozen=True)
 class StationSnapshot:
-    location_id: int
+    # None for a station only Luchtmeetnet has (ADR 0017).
+    location_id: int | None
     name: str
     longitude: float
     latitude: float
     readings: dict[str, Reading]
+    luchtmeetnet_number: str | None = None
+    sources: tuple[str, ...] = ("openaq",)
 
 
 # Strict types throughout: the API sends JSON numbers and strings, so "12.4" or true where a number

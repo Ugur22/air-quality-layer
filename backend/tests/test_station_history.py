@@ -12,7 +12,13 @@ from httpx import AsyncClient
 from airlayer.history import HistoryProvider, get_history_provider
 from airlayer.main import app
 from tests.conftest import Tenant
-from tests.test_map_layers import Layer, get_layer, make_layer, reading  # noqa: F401
+from tests.test_map_layers import (  # noqa: F401
+    Layer,
+    add_luchtmeetnet_station,
+    get_layer,
+    make_layer,
+    reading,
+)
 
 NOW = datetime(2026, 10, 3, 14, 6, 13, tzinfo=UTC)
 # location id 1 is "Low" in test_map_layers.STATIONS (pm25 and no2); 4 is "NoPm" (no2 only).
@@ -561,3 +567,18 @@ async def test_without_an_api_key_bad_requests_are_still_404_and_400(
     assert (await get_history(client, layer, str(uuid4()))).status_code == 404
     assert (await get_history(client, layer, sid, {"hours": "999"})).status_code == 400
     assert (await get_history(client, layer, sid, {"property": "o3"})).status_code == 400
+
+
+async def test_a_station_only_luchtmeetnet_has_no_history_and_openaq_is_not_asked(
+    client: AsyncClient, make_layer: Callable[..., Layer], upstream: Upstream
+) -> None:
+    layer = make_layer()
+    add_luchtmeetnet_station(layer, "NL1")
+    sid = await station_id(client, layer, "Only Luchtmeetnet")
+
+    response = await get_history(client, layer, sid, {"property": "bcwb"})
+
+    assert response.status_code == 200
+    history = response.json()["history"]
+    assert (history["property"], history["unit"], history["points"]) == ("bcwb", None, [])
+    assert upstream.calls == []

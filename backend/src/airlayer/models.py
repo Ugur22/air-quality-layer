@@ -124,6 +124,10 @@ class SyncJob(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     station_count: Mapped[int | None]
     errors: Mapped[list[dict[str, str]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    # A succeeded job that lacks part of its data, e.g. Luchtmeetnet was down (ADR 0017).
+    warnings: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
 
 
 class StationReading(Base):
@@ -132,6 +136,13 @@ class StationReading(Base):
         UniqueConstraint(
             "sync_job_id", "openaq_location_id", name="uq_station_readings_job_location"
         ),
+        UniqueConstraint(
+            "sync_job_id", "luchtmeetnet_number", name="uq_station_readings_job_luchtmeetnet"
+        ),
+        CheckConstraint(
+            "openaq_location_id IS NOT NULL OR luchtmeetnet_number IS NOT NULL",
+            name="ck_station_readings_has_source_id",
+        ),
         Index("ix_station_readings_geom", "geom", postgresql_using="gist"),
     )
 
@@ -139,7 +150,12 @@ class StationReading(Base):
     # Readings are only reachable through an organisation-scoped sync job lookup, so they carry
     # no organisation column of their own.
     sync_job_id: Mapped[UUID] = mapped_column(ForeignKey("sync_jobs.id"))
-    openaq_location_id: Mapped[int] = mapped_column(BigInteger)
+    # A station only Luchtmeetnet has carries no OpenAQ id (ADR 0017); one of the two is always set.
+    openaq_location_id: Mapped[int | None] = mapped_column(BigInteger)
+    luchtmeetnet_number: Mapped[str | None] = mapped_column(Text)
+    sources: Mapped[list[str]] = mapped_column(
+        JSONB, server_default=text("""'["openaq"]'::jsonb""")
+    )
     name: Mapped[str] = mapped_column(Text)
     geom: Mapped[str] = mapped_column(Geometry("POINT", srid=4326, spatial_index=False))
     # {"pm25": {"value": 12.4, "unit": "µg/m³", "observed_at": "..."}} (ADR 0010)

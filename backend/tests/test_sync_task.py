@@ -13,7 +13,7 @@ from airlayer.config import get_settings
 from airlayer.jobs import app as jobs_app
 from airlayer.jobs import sync_region
 from airlayer.openaq import TransientUpstreamError
-from tests.conftest import TEST_URL, Tenant
+from tests.conftest import TEST_URL
 from tests.test_openaq_client import Upstream, latest, location, sensor
 
 Handler = Callable[[httpx.Request], httpx.Response]
@@ -33,27 +33,6 @@ def two_stations() -> Upstream:
         [location(1, [sensor(11, "pm25"), sensor(12, "no2")]), location(2)],
         {1: [latest(11, 1, 12.4), latest(12, 1, 30.0)], 2: [latest(20, 2, 4.2)]},
     )
-
-
-@pytest.fixture
-def make_job(make_tenant: Callable[[], Tenant]) -> Callable[..., UUID]:
-    def make(status: str = "queued", age_minutes: int = 0) -> UUID:
-        tenant = make_tenant()
-        region_id, job_id = uuid4(), uuid4()
-        with psycopg.connect(TEST_URL, autocommit=True) as conn:
-            conn.execute(
-                "INSERT INTO regions (id, project_id, organisation_id, name, geom) VALUES "
-                "(%s, %s, %s, 'r', ST_MakeEnvelope(4.85, 52.35, 4.95, 52.40, 4326))",
-                (region_id, tenant.project_id, tenant.organisation_id),
-            )
-            conn.execute(
-                "INSERT INTO sync_jobs (id, organisation_id, region_id, status, created_at) "
-                "VALUES (%s, %s, %s, %s, now() - make_interval(mins => %s))",
-                (job_id, tenant.organisation_id, region_id, status, age_minutes),
-            )
-        return job_id
-
-    return make
 
 
 def job_row(job_id: UUID) -> dict[str, Any]:
@@ -109,6 +88,7 @@ async def test_success_stores_readings_and_the_terminal_status_together(
         "value": 12.4,
         "unit": "µg/m³",
         "observed_at": "2026-10-03T08:00:00Z",
+        "source": "openaq",
     }
     assert rows[0][5]["no2"]["value"] == 30.0
 

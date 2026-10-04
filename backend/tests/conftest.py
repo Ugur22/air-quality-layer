@@ -39,6 +39,15 @@ def database() -> Iterator[None]:
     yield
 
 
+@pytest.fixture(autouse=True)
+def no_luchtmeetnet_stations(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Syncs in tests never reach the real Luchtmeetnet: its catalogue is empty unless a test
+    sets one (ADR 0017)."""
+    from airlayer import luchtmeetnet
+
+    monkeypatch.setattr(luchtmeetnet, "load_catalogue", lambda: ())
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def queue(database: None) -> AsyncIterator[None]:
     from airlayer.jobs import app
@@ -81,5 +90,26 @@ def make_tenant(database: None) -> Callable[[], Tenant]:
                 (tenant.project_id, tenant.organisation_id, "Test project"),
             )
         return tenant
+
+    return make
+
+
+@pytest.fixture
+def make_job(make_tenant: Callable[[], Tenant]) -> Callable[..., UUID]:
+    def make(status: str = "queued", age_minutes: int = 0) -> UUID:
+        tenant = make_tenant()
+        region_id, job_id = uuid4(), uuid4()
+        with psycopg.connect(TEST_URL, autocommit=True) as conn:
+            conn.execute(
+                "INSERT INTO regions (id, project_id, organisation_id, name, geom) VALUES "
+                "(%s, %s, %s, 'r', ST_MakeEnvelope(4.85, 52.35, 4.95, 52.40, 4326))",
+                (region_id, tenant.project_id, tenant.organisation_id),
+            )
+            conn.execute(
+                "INSERT INTO sync_jobs (id, organisation_id, region_id, status, created_at) "
+                "VALUES (%s, %s, %s, %s, now() - make_interval(mins => %s))",
+                (job_id, tenant.organisation_id, region_id, status, age_minutes),
+            )
+        return job_id
 
     return make

@@ -22,6 +22,34 @@ describe('SyncStatus', () => {
     expect(screen.getByRole('status')).toHaveTextContent('12 stations')
   })
 
+  it('says when a succeeded sync is missing a source, instead of staying silent', () => {
+    const warnings = [{ code: 'luchtmeetnet_unavailable', message: 'server words' }]
+    render(<SyncStatus job={{ ...succeededJob, warnings }} />)
+
+    expect(screen.getByRole('status')).toHaveTextContent('12 stations')
+    expect(screen.getByRole('status')).toHaveTextContent(/luchtmeetnet could not be used/i)
+  })
+
+  it('falls back to the server message for a warning it does not know', () => {
+    render(
+      <SyncStatus
+        job={{ ...succeededJob, warnings: [{ code: 'new_thing', message: 'Heads up.' }] }}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Heads up.')
+  })
+
+  it('shows a warning code that matches an object property as the server message', () => {
+    render(
+      <SyncStatus
+        job={{ ...succeededJob, warnings: [{ code: 'constructor', message: 'Server words.' }] }}
+      />,
+    )
+
+    expect(screen.getByRole('status')).toHaveTextContent('Server words.')
+  })
+
   it('uses the singular for one station', () => {
     render(<SyncStatus job={{ ...succeededJob, station_count: 1 }} />)
 

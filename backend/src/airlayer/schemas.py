@@ -93,6 +93,8 @@ class SyncJobOut(BaseModel):
     # The layer is derived from the sync job, so its id is the job's id (ADR 0010).
     map_layer_id: UUID | None
     errors: list[SyncError]
+    # Only on a succeeded job that is missing part of its data (ADR 0017).
+    warnings: list[SyncError]
 
 
 class SyncJobResponse(BaseModel):
@@ -103,10 +105,13 @@ class ReadingOut(BaseModel):
     value: float
     unit: str
     observed_at: datetime
+    # A layer stored before a second source existed has no source on its readings (ADR 0017).
+    source: str = "openaq"
 
 
 class StationProperties(BaseModel):
     name: str
+    sources: list[str]
     readings: dict[str, ReadingOut]
 
 

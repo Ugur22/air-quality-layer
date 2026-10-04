@@ -1,0 +1,1363 @@
+{
+ "fetched_at": "2026-10-04T08:44:22.428414+00:00",
+ "stations": [
+  {
+   "number": "NL01484",
+   "name": "Rotterdam-Geulhaven",
+   "longitude": 4.3125,
+   "latitude": 51.889,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL01485",
+   "name": "Rotterdam-Hoogvliet",
+   "longitude": 4.35524,
+   "latitude": 51.86742,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL01487",
+   "name": "Rotterdam-Pleinweg",
+   "longitude": 4.48066,
+   "latitude": 51.89113,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01488",
+   "name": "Rotterdam-Zwartewaalstraat",
+   "longitude": 4.48759,
+   "latitude": 51.89361,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01489",
+   "name": "Ridderkerk-A16",
+   "longitude": 4.58007,
+   "latitude": 51.86942,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01491",
+   "name": "Overschie-A13",
+   "longitude": 4.4307,
+   "latitude": 51.93858,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01493",
+   "name": "Rotterdam-Statenweg",
+   "longitude": 4.46136,
+   "latitude": 51.92711,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01494",
+   "name": "Schiedam-A.Arienstraat",
+   "longitude": 4.40139,
+   "latitude": 51.92139,
+   "components": [
+    "BCWB",
+    "C6H6",
+    "C7H8",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL01495",
+   "name": "Maassluis-Kwartellaan",
+   "longitude": 4.22799,
+   "latitude": 51.93207,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL01496",
+   "name": "Rotterdam-HvHolland",
+   "longitude": 4.121944,
+   "latitude": 51.977802999084986,
+   "components": [
+    "BCWB",
+    "C6H6",
+    "C7H8",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL01497",
+   "name": "Rotterdam-Maasvlakte",
+   "longitude": 3.99972,
+   "latitude": 51.933517,
+   "components": [
+    "LKI",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01912",
+   "name": "Ridderkerk-Voorweg",
+   "longitude": 4.563812,
+   "latitude": 51.861729,
+   "components": [
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL01913",
+   "name": "Sluiskil-Stroodorpestraat",
+   "longitude": 3.83859,
+   "latitude": 51.27938,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL10107",
+   "name": "Posterholt-Vlodropperweg",
+   "longitude": 6.042399,
+   "latitude": 51.11919,
+   "components": [
+    "NO",
+    "NO2",
+    "O3"
+   ]
+  },
+  {
+   "number": "NL10131",
+   "name": "Vredepeel-Vredeweg",
+   "longitude": 5.85307,
+   "latitude": 51.54052,
+   "components": [
+    "BCWB",
+    "FN",
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10133",
+   "name": "Wijnandsrade-Opfergeltstraat",
+   "longitude": 5.881748,
+   "latitude": 50.90228,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL10136",
+   "name": "Heerlen-Looierstraat",
+   "longitude": 5.970496,
+   "latitude": 50.88796,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10138",
+   "name": "Heerlen-Jamboreepad",
+   "longitude": 5.986853,
+   "latitude": 50.90032,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10230",
+   "name": "Biest Houtakker-Biestsestraat",
+   "longitude": 5.14845,
+   "latitude": 51.51844,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10235",
+   "name": "Huijbergen-Vennekenstraat",
+   "longitude": 4.359835,
+   "latitude": 51.43444,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10236",
+   "name": "Eindhoven-Genovevalaan",
+   "longitude": 5.47235,
+   "latitude": 51.46866,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10237",
+   "name": "Eindhoven-Noordbrabantlaan",
+   "longitude": 5.444833,
+   "latitude": 51.44416,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10240",
+   "name": "Breda-Tilburgseweg",
+   "longitude": 4.824944,
+   "latitude": 51.59353,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10241",
+   "name": "Breda-Bastenakenstraat",
+   "longitude": 4.781016,
+   "latitude": 51.60308,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10246",
+   "name": "Fijnaart-Zwingelspaansedijk",
+   "longitude": 4.515271,
+   "latitude": 51.653729,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10247",
+   "name": "Veldhoven-Europalaan",
+   "longitude": 5.393328,
+   "latitude": 51.407365,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10248",
+   "name": "Nistelrode-Gagelstraat",
+   "longitude": 5.5433281,
+   "latitude": 51.69818779,
+   "components": [
+    "LKI",
+    "NH3",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10301",
+   "name": "Zierikzee-Lange Slikweg",
+   "longitude": 3.916623,
+   "latitude": 51.634706,
+   "components": [
+    "NO",
+    "NO2",
+    "O3"
+   ]
+  },
+  {
+   "number": "NL10318",
+   "name": "Philippine-Stelleweg",
+   "longitude": 3.749484,
+   "latitude": 51.294498,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL10320",
+   "name": "Burgh-Haamstede",
+   "longitude": 3.7145,
+   "latitude": 51.70644,
+   "components": [
+    "LKI",
+    "NH3"
+   ]
+  },
+  {
+   "number": "NL10404",
+   "name": "Den Haag-Rebecquestraat",
+   "longitude": 4.289185,
+   "latitude": 52.077148,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10418",
+   "name": "Rotterdam-Schiedamsevest",
+   "longitude": 4.479923,
+   "latitude": 51.914233,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10437",
+   "name": "Westmaas-Groeneweg",
+   "longitude": 4.450529,
+   "latitude": 51.786579,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10442",
+   "name": "Dordrecht-Bamendaweg",
+   "longitude": 4.708239,
+   "latitude": 51.800658,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10444",
+   "name": "De Zilk-Vogelaarsdreef",
+   "longitude": 4.510817,
+   "latitude": 52.296556,
+   "components": [
+    "BCWB",
+    "FN",
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL10445",
+   "name": "Den Haag-Amsterdamse Veerkade",
+   "longitude": 4.315872,
+   "latitude": 52.075071,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10446",
+   "name": "Den Haag-Bleriotlaan",
+   "longitude": 4.359376,
+   "latitude": 52.039023,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10449",
+   "name": "Vlaardingen-Riouwlaan",
+   "longitude": 4.329431,
+   "latitude": 51.914883,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10450",
+   "name": "Den Haag-Neherkade",
+   "longitude": 4.318551,
+   "latitude": 52.062537,
+   "components": [
+    "NO",
+    "NO2",
+    "NOx",
+    "O3",
+    "PM10",
+    "PM2.5",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10538",
+   "name": "Wieringerwerf-Medemblikkerweg",
+   "longitude": 5.048975,
+   "latitude": 52.80342,
+   "components": [
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10552",
+   "name": "Haarlem-Freddie Oversteegenstraat ",
+   "longitude": 4.651789,
+   "latitude": 52.37029,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10617",
+   "name": "Biddinghuizen-Kuilweg",
+   "longitude": 5.59338,
+   "latitude": 52.423214,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10633",
+   "name": "Zegveld-Oude Meije",
+   "longitude": 4.83819,
+   "latitude": 52.13795,
+   "components": [
+    "BCWB",
+    "FN",
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10636",
+   "name": "Utrecht-Kardinaal de Jongweg",
+   "longitude": 5.124464,
+   "latitude": 52.105031,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10639",
+   "name": "Utrecht-Constant Erzeijstraat",
+   "longitude": 5.120507,
+   "latitude": 52.067748,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10641",
+   "name": "Breukelen-A2",
+   "longitude": 4.987444,
+   "latitude": 52.20153,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10643",
+   "name": "Utrecht-Griftpark",
+   "longitude": 5.128183,
+   "latitude": 52.101308,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10644",
+   "name": "Cabauw-Wielsekade",
+   "longitude": 4.923301,
+   "latitude": 51.974489,
+   "components": [
+    "BCWB",
+    "FN",
+    "Hg",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS",
+    "SO2",
+    "UFP"
+   ]
+  },
+  {
+   "number": "NL10722",
+   "name": "Eibergen-Lintveldseweg",
+   "longitude": 6.605367,
+   "latitude": 52.091801,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL10738",
+   "name": "Wekerom-Riemterdijk",
+   "longitude": 5.708419,
+   "latitude": 52.111621,
+   "components": [
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10741",
+   "name": "Nijmegen-Graafseweg",
+   "longitude": 5.857777,
+   "latitude": 51.841372,
+   "components": [
+    "BCWB",
+    "CO",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10742",
+   "name": "Nijmegen-Ruyterstraat",
+   "longitude": 5.856938,
+   "latitude": 51.838221,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10807",
+   "name": "Hellendoorn-Luttenbergerweg",
+   "longitude": 6.402919,
+   "latitude": 52.38833,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10818",
+   "name": "Barsbeek-De Veenen",
+   "longitude": 6.017571,
+   "latitude": 52.654144,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10821",
+   "name": "Enschede-Winkelshorst",
+   "longitude": 6.919494,
+   "latitude": 52.234504,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10918",
+   "name": "Balk-Trophornsterweg",
+   "longitude": 5.573491,
+   "latitude": 52.916915,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10929",
+   "name": "Valthermond-Noorderdiep",
+   "longitude": 6.932432,
+   "latitude": 52.875725,
+   "components": [
+    "BCWB",
+    "FN",
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL10934",
+   "name": "Kollumerwaard-Hooge Zuidwal",
+   "longitude": 6.276815,
+   "latitude": 53.330425,
+   "components": [
+    "NH3",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS",
+    "SO2",
+    "UFP"
+   ]
+  },
+  {
+   "number": "NL10937",
+   "name": "Groningen-Europaweg",
+   "longitude": 6.578901,
+   "latitude": 53.217796,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL10938",
+   "name": "Groningen-Nijensteinheerd",
+   "longitude": 6.608937,
+   "latitude": 53.246535,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49002",
+   "name": "Amsterdam-Haarlemmerweg",
+   "longitude": 4.87575,
+   "latitude": 52.385422,
+   "components": [
+    "NO",
+    "NO2"
+   ]
+  },
+  {
+   "number": "NL49003",
+   "name": "Amsterdam-Nieuwendammerdijk",
+   "longitude": 4.943822,
+   "latitude": 52.389314,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49007",
+   "name": "Amsterdam-Einsteinweg",
+   "longitude": 4.845233,
+   "latitude": 52.381331,
+   "components": [
+    "CO",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49012",
+   "name": "Amsterdam-Van Diemenstraat",
+   "longitude": 4.887811,
+   "latitude": 52.389983,
+   "components": [
+    "BCWB",
+    "CO",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49014",
+   "name": "Amsterdam-Vondelpark",
+   "longitude": 4.866208,
+   "latitude": 52.359714,
+   "components": [
+    "BCWB",
+    "CO",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49016",
+   "name": "Amsterdam-Westerpark",
+   "longitude": 4.870157,
+   "latitude": 52.393972,
+   "components": [
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL49017",
+   "name": "Amsterdam-Stadhouderskade",
+   "longitude": 4.8997,
+   "latitude": 52.358039,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49019",
+   "name": "Amsterdam-Oude Schans",
+   "longitude": 4.9044,
+   "latitude": 52.372056,
+   "components": [
+    "NO",
+    "NO2"
+   ]
+  },
+  {
+   "number": "NL49020",
+   "name": "Amsterdam-Jan van Galenstraat",
+   "longitude": 4.860319,
+   "latitude": 52.374786,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL49021",
+   "name": "Amsterdam -Kantershof",
+   "longitude": 4.988397,
+   "latitude": 52.320692,
+   "components": [
+    "NO",
+    "NO2"
+   ]
+  },
+  {
+   "number": "NL49022",
+   "name": "Amsterdam-Ookmeer",
+   "longitude": 4.793344,
+   "latitude": 52.366811,
+   "components": [
+    "NO",
+    "NO2"
+   ]
+  },
+  {
+   "number": "NL49546",
+   "name": "Zaanstad-Hemkade",
+   "longitude": 4.83206,
+   "latitude": 52.42023,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL49551",
+   "name": "IJmuiden-Kanaalstraat",
+   "longitude": 4.6018419999999995,
+   "latitude": 52.463039,
+   "components": [
+    "CO",
+    "FN",
+    "H2S",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL49553",
+   "name": "Wijk aan Zee-De Banjaert",
+   "longitude": 4.601986,
+   "latitude": 52.493992,
+   "components": [
+    "CO",
+    "FN",
+    "H2S",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL49556",
+   "name": "De Rijp-Oostdijkje",
+   "longitude": 4.8617,
+   "latitude": 52.56359,
+   "components": [
+    "BCWB",
+    "FN",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49557",
+   "name": "Wijk aan Zee-Bosweg",
+   "longitude": 4.599313,
+   "latitude": 52.490052,
+   "components": [
+    "C10H8",
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49561",
+   "name": "Badhoevedorp-Sloterweg",
+   "longitude": 4.774006,
+   "latitude": 52.334003,
+   "components": [
+    "CO",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49564",
+   "name": "Hoofddorp-Hoofdweg",
+   "longitude": 4.71507132053375,
+   "latitude": 52.3274501787129,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL49565",
+   "name": "Oude Meer-Aalsmeerderdijk",
+   "longitude": 4.77082,
+   "latitude": 52.28013,
+   "components": [
+    "NO",
+    "NO2",
+    "PM10"
+   ]
+  },
+  {
+   "number": "NL49570",
+   "name": "Beverwijk-Creutzberglaan",
+   "longitude": 4.640531,
+   "latitude": 52.489303,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49572",
+   "name": "Velsen-Staalstraat",
+   "longitude": 4.6288,
+   "latitude": 52.4744,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49573",
+   "name": "Velsen-Reyndersweg",
+   "longitude": 4.579343,
+   "latitude": 52.478871,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49680",
+   "name": "Almere-Boomgaardweg",
+   "longitude": 5.239257,
+   "latitude": 52.373572,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL49701",
+   "name": "Zaandam-Wagenschotpad",
+   "longitude": 4.816706,
+   "latitude": 52.448011,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49703",
+   "name": "Spaarnwoude-Machineweg",
+   "longitude": 4.728581,
+   "latitude": 52.398437,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL49704",
+   "name": "Zaanstad-Hoogtij",
+   "longitude": 4.773,
+   "latitude": 52.428,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25",
+    "SO2"
+   ]
+  },
+  {
+   "number": "NL49980",
+   "name": "Baamsum - Oude Ae",
+   "longitude": 7.038925,
+   "latitude": 53.290343,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL50002",
+   "name": "Geleen-Vouershof ",
+   "longitude": 5.81071,
+   "latitude": 50.96309,
+   "components": [
+    "NO",
+    "NO2",
+    "O3"
+   ]
+  },
+  {
+   "number": "NL50003",
+   "name": "Geleen-Asterstraat",
+   "longitude": 5.82224,
+   "latitude": 50.98445,
+   "components": [
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL50007",
+   "name": "Maastricht-Hoge_Fronten",
+   "longitude": 5.6758,
+   "latitude": 50.85205,
+   "components": [
+    "BCWB",
+    "FN",
+    "O3",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL50010",
+   "name": "Maastricht-A2-Philipsweg",
+   "longitude": 5.718977489396707,
+   "latitude": 50.841053234998604,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL50011",
+   "name": "Nederweert-Kuilstraat",
+   "longitude": 5.771363,
+   "latitude": 51.303331,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL50012",
+   "name": "Eijsden-Trichterweg",
+   "longitude": 5.703113,
+   "latitude": 50.78366,
+   "components": [
+    "BCWB",
+    "FN",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL50013",
+   "name": "Meerssen- Beekerweg",
+   "longitude": 5.773652,
+   "latitude": 50.905079,
+   "components": [
+    "PS"
+   ]
+  },
+  {
+   "number": "NL50014",
+   "name": "Gulpen-Kuttingerweg",
+   "longitude": 5.916794379061132,
+   "latitude": 50.75998070408913,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "O3",
+    "PM10",
+    "PM25",
+    "PS"
+   ]
+  },
+  {
+   "number": "NL53001",
+   "name": "Ossendrecht-Burgemeester Voetenstraat",
+   "longitude": 4.3202367,
+   "latitude": 51.393289,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL53004",
+   "name": "Moerdijk-Julianastraat",
+   "longitude": 4.623713,
+   "latitude": 51.699409,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL53015",
+   "name": "Klundert-Kerkweg",
+   "longitude": 4.541659,
+   "latitude": 51.6689355,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL53016",
+   "name": "Zevenbergen-Galgenweg",
+   "longitude": 4.594882,
+   "latitude": 51.653205,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL53020",
+   "name": "Strijensas Buitendijk",
+   "longitude": 4.583248,
+   "latitude": 51.713396,
+   "components": [
+    "C6H6",
+    "C7H8",
+    "C8H10",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL54004",
+   "name": "Arnhem Velperbroek",
+   "longitude": 5.969485,
+   "latitude": 51.978328,
+   "components": [
+    "BCWB",
+    "FN",
+    "NO",
+    "NO2",
+    "PM10",
+    "PM25"
+   ]
+  },
+  {
+   "number": "NL54010",
+   "name": "Arnhem GelreDome",
+   "longitude": 5.897657,
+   "latitude": 51.962296,
+   "components": [
+    "PM10",
+    "PM25"
+   ]
+  }
+ ]
+}

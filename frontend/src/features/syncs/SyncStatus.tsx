@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, LoaderCircle } from 'lucide-react'
 import { match } from 'ts-pattern'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { describeSyncFailure } from './messages'
+import { describeSyncFailure, describeSyncWarning } from './messages'
 import type { SyncJob } from './types'
 
 function Progress({ title, detail }: { title: string; detail: string }) {
@@ -27,7 +27,7 @@ export function SyncStatus({ job }: { job: SyncJob }) {
     ))
     .with('processing', () => (
       <Progress
-        title="Fetching stations from OpenAQ"
+        title="Fetching stations"
         detail="Reading the latest values for every station in the region."
       />
     ))
@@ -42,9 +42,14 @@ export function SyncStatus({ job }: { job: SyncJob }) {
             </p>
             <p className="text-muted">
               {count === 0
-                ? 'The sync worked, but OpenAQ has no monitoring stations here.'
+                ? 'The sync worked, but no source has monitoring stations here.'
                 : 'The latest readings are stored and shown on the map.'}
             </p>
+            {job.warnings?.map((w, i) => (
+              <p key={`${w.code}-${String(i)}`} className="mt-1 text-muted">
+                {describeSyncWarning(w.code, w.message)}
+              </p>
+            ))}
           </div>
         </div>
       )

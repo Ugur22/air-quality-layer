@@ -14,4 +14,6 @@ export interface SyncJob {
   station_count: number | null
   map_layer_id: string | null
   errors: SyncError[]
+  /** Only on a succeeded job that is missing part of its data. */
+  warnings?: SyncError[]
 }

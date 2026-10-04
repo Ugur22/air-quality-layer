@@ -2,13 +2,15 @@ export interface Reading {
   value: number
   unit: string
   observed_at: string
+  /** openaq | luchtmeetnet; absent on a layer stored before there was a second source. */
+  source?: string
 }
 
 export interface StationFeature {
   type: 'Feature'
   id: string
   geometry: { type: 'Point'; coordinates: [number, number] }
-  properties: { name: string; readings: Record<string, Reading> }
+  properties: { name: string; sources?: string[]; readings: Record<string, Reading> }
 }
 
 export interface MapLayerResponse {

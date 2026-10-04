@@ -388,7 +388,7 @@ describe('App', () => {
 
     await user.click(await screen.findByRole('button', { name: /create region and sync/i }))
 
-    expect(await screen.findByText('Fetching stations from OpenAQ')).toBeInTheDocument()
+    expect(await screen.findByText('Fetching stations')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /create region and sync/i })).toBeDisabled()
   })
 

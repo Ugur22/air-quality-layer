@@ -16,6 +16,17 @@ export function describeSyncFailure(code: string, serverMessage: string): string
   return SYNC_FAILURES[code] ?? serverMessage
 }
 
+const SYNC_WARNINGS: Record<string, string> = {
+  luchtmeetnet_unavailable:
+    'Luchtmeetnet could not be used, so these stations come from OpenAQ only.',
+}
+
+/** Words for a warning on a succeeded sync; an unknown code falls back to the server's message. */
+export function describeSyncWarning(code: string, serverMessage: string): string {
+  // hasOwn: a code such as "constructor" must not find something on the object's prototype.
+  return Object.hasOwn(SYNC_WARNINGS, code) ? (SYNC_WARNINGS[code] ?? serverMessage) : serverMessage
+}
+
 const REQUEST_FAILURES: Record<string, string> = {
   network_error: 'Could not reach the server. Is the backend running?',
   conflict: 'A sync is already running for this region. Wait for it to finish.',

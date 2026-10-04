@@ -1,4 +1,4 @@
-import { useEffect, useImperativeHandle, type ReactNode, type Ref } from 'react'
+import { useEffect, useImperativeHandle, useState, type ReactNode, type Ref } from 'react'
 import { FAKE_MAP, mapSpies } from './mapSpies'
 
 /**
@@ -30,10 +30,15 @@ export function Map({
   interactiveLayerIds?: string[]
   mapStyle?: string
   initialViewState?: unknown
-  ref?: Ref<{ fitBounds: typeof mapSpies.fitBounds; getMap: () => unknown }>
+  ref?: Ref<{
+    fitBounds: typeof mapSpies.fitBounds
+    easeTo: typeof mapSpies.easeTo
+    getMap: () => unknown
+  }>
 }) {
   useImperativeHandle(ref, () => ({
     fitBounds: mapSpies.fitBounds,
+    easeTo: mapSpies.easeTo,
     getMap: () => FAKE_MAP,
   }))
   useEffect(() => {
@@ -137,4 +142,10 @@ export function Layer({
 
 export function NavigationControl() {
   return null
+}
+
+/** deck.gl draws on a WebGL canvas, which jsdom lacks; the overlay is a stub that picks nothing. */
+// eslint-disable-next-line react-refresh/only-export-components
+export function useControl<T>(create: () => T): T {
+  return useState(create)[0]
 }
