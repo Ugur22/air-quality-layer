@@ -171,6 +171,14 @@ function Legend({
   )
 }
 
+/** Keeps the previous view while the camera has barely moved, so React does not re-render per frame. */
+function nextView(previous: MapView, next: MapView): MapView {
+  return Math.abs(previous.zoom - next.zoom) < 0.05 &&
+    Math.abs(previous.latitude - next.latitude) < 0.1
+    ? previous
+    : next
+}
+
 function readView(map: { getZoom: () => number; getCenter: () => { lat: number } }): MapView {
   return { zoom: map.getZoom(), latitude: map.getCenter().lat }
 }
@@ -212,7 +220,7 @@ export function StationMap({
   const mapRef = useRef<MapRef>(null)
   const overlayRef = useRef<MapboxOverlay>(null)
   const [columns, setColumns] = useState(false)
-  // Column size follows the zoom; it is read once a gesture settles, so a pinch does not rebuild layers.
+  // Column size follows the zoom, in steps small enough to look continuous.
   const [view, setView] = useState<MapView>({ zoom: 8, latitude: 52 })
   const [pointer, setPointer] = useState(false)
   // The station under the pointer and where, for the tooltip.
@@ -383,6 +391,11 @@ export function StationMap({
             addBadgeImage(event.target)
             setBadgeReady(true)
             setView(readView(event.target))
+          }}
+          // Followed during the move too: sized only at its end, the columns would keep the old
+          // zoom's size for the whole fly-over and then jump.
+          onMove={(event) => {
+            setView((previous) => nextView(previous, readView(event.target)))
           }}
           onMoveEnd={(event) => {
             setView(readView(event.target))
