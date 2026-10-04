@@ -1,6 +1,6 @@
 import 'maplibre-gl/dist/maplibre-gl.css'
 import type { MapboxOverlay } from '@deck.gl/mapbox'
-import { Box, SquareDashedMousePointer } from 'lucide-react'
+import { Box, ChevronDown, SquareDashedMousePointer } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Layer, Map, NavigationControl, Source, type MapRef } from 'react-map-gl/maplibre'
 import type { Bbox } from '@/features/regions/types'
@@ -78,95 +78,159 @@ function Legend({
   range: ReturnType<typeof valueRange>
   showSyncedBox: boolean
 }) {
+  const [guideOpen, setGuideOpen] = useState(false)
   const classes = range === null ? null : guidelineClasses(property, range.unit)
+  const empty = property === null || range === null
   return (
     <div
       role="group"
       aria-label="Map legend"
-      className="absolute bottom-6 left-3 z-10 flex max-h-52 max-w-[min(17rem,calc(100%-1.5rem))] flex-col gap-1.5 overflow-y-auto rounded-lg border border-line bg-surface/95 p-3 text-xs text-muted shadow-md"
+      className="absolute bottom-6 left-3 z-10 flex max-h-[70%] w-[min(17.5rem,calc(100%-1.5rem))] flex-col gap-2.5 overflow-y-auto rounded-lg border border-line bg-surface/95 px-3.5 py-3 text-xs text-muted shadow-md"
     >
-      {property === null || range === null ? (
+      {empty ? (
         <p>{property === null ? 'Nothing to colour by.' : `No station reports ${property}.`}</p>
-      ) : classes !== null ? (
-        <div className="flex flex-col gap-1">
-          <p>
-            Latest <span className="font-mono text-ink">{property}</span> reading ({range.unit})
-            against WHO 2021 24-hour guideline levels
-          </p>
-          <div className="flex flex-wrap gap-x-3 gap-y-1">
-            {classes.map((c) => (
-              <span key={c.label} className="flex items-center gap-1.5">
-                <span
-                  aria-hidden
-                  className="size-3 rounded-full border border-ink/70"
-                  style={{ background: c.colour }}
-                />
-                <span className="tabular-nums">{c.label}</span>
-              </span>
-            ))}
-          </div>
-        </div>
       ) : (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-          <span className="font-mono text-ink">{property}</span>
-          <span className="tabular-nums">{formatValue(range.min)}</span>
-          <span
-            aria-hidden
-            className="h-2.5 w-24 rounded-full border border-line"
-            style={{ background: `linear-gradient(to right, ${COLOUR_STOPS.join(', ')})` }}
-          />
-          <span className="tabular-nums">
-            {formatValue(range.max)} {range.unit}
-          </span>
-          <span>(relative to this layer)</span>
-        </div>
+        <>
+          <div className="flex items-baseline justify-between gap-2">
+            <span className="font-display text-sm font-semibold text-ink">
+              <span className="font-mono text-[13px] font-medium">{property}</span>
+              {classes !== null ? ' now' : null}
+            </span>
+            <span className="font-mono text-[11px]">{range.unit}</span>
+          </div>
+          {classes !== null ? (
+            <>
+              <div className="flex flex-col gap-1">
+                <span className="sr-only">
+                  Latest {property} reading ({range.unit}) against WHO 2021 24-hour guideline
+                  levels: {classes.map((c) => c.label).join(', ')}
+                </span>
+                <div aria-hidden className="grid h-2.5 grid-flow-col auto-cols-fr gap-0.5">
+                  {classes.map((c) => (
+                    <i
+                      key={c.label}
+                      className="rounded-sm shadow-[inset_0_0_0_1px_rgb(18_32_31/0.28)] first:rounded-l-full last:rounded-r-full"
+                      style={{ background: c.colour }}
+                    />
+                  ))}
+                </div>
+                <div
+                  aria-hidden
+                  className="relative h-3.5 font-mono text-[11px] leading-[14px] text-ink tabular-nums"
+                >
+                  <span className="absolute left-0 text-muted">0</span>
+                  {classes.slice(0, -1).map((c, i) => (
+                    <span
+                      key={c.label}
+                      className="absolute -translate-x-1/2"
+                      style={{ left: `${String(((i + 1) * 100) / classes.length)}%` }}
+                    >
+                      {formatValue(c.upTo)}
+                    </span>
+                  ))}
+                  <span className="absolute right-0 text-muted">&gt;</span>
+                </div>
+              </div>
+              <p className="text-[10.5px]">Against WHO 2021 24-hour guideline</p>
+            </>
+          ) : (
+            <div className="flex flex-col gap-1">
+              <div
+                aria-hidden
+                className="h-2.5 rounded-full border border-line"
+                style={{ background: `linear-gradient(to right, ${COLOUR_STOPS.join(', ')})` }}
+              />
+              <div className="relative flex justify-between font-mono text-[11px] text-ink tabular-nums">
+                <span>{formatValue(range.min)}</span>
+                <span className="font-sans text-muted">relative to this layer</span>
+                <span>{formatValue(range.max)}</span>
+              </div>
+            </div>
+          )}
+        </>
       )}
       {property !== null ? (
-        <div className="flex flex-col gap-1">
-          {classes === null ? (
-            <p className="flex items-center gap-2">
-              <span
-                aria-hidden
-                className="inline-grid h-5 min-w-9 place-items-center rounded-full bg-accent px-2 font-mono text-[11px] text-white"
-              >
-                12.4
-              </span>
-              Latest {property} reading
-            </p>
-          ) : null}
-          <p className="flex items-center gap-2">
-            <span
+        <div className="flex items-center justify-between gap-2.5 border-t border-line pt-2">
+          <span className="flex items-center gap-1.5">
+            <span aria-hidden className="size-[9px] rounded-full border border-muted bg-line" />
+            No usable {property} value
+          </span>
+          <button
+            type="button"
+            aria-expanded={guideOpen}
+            aria-controls="legend-marker-guide"
+            onClick={() => {
+              setGuideOpen((open) => !open)
+            }}
+            className="inline-flex items-center gap-1 font-medium text-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
+          >
+            Marker guide
+            <ChevronDown
               aria-hidden
-              className="mx-3.5 size-2.5 rounded-full border border-muted bg-line"
+              className={`size-3 transition-transform motion-reduce:transition-none ${guideOpen ? 'rotate-180' : ''}`}
             />
-            <span>No usable {property} value</span>
-          </p>
+          </button>
         </div>
       ) : null}
-      <details className="group">
-        <summary className="cursor-pointer select-none text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent">
-          What the markers mean
-        </summary>
-        <div className="mt-1.5 flex flex-col gap-1.5">
-          {range !== null && range.otherUnitCount > 0 ? (
-            <p>
+      <ul
+        id="legend-marker-guide"
+        hidden={!guideOpen}
+        className="m-0 grid list-none gap-2 p-0 [&>li]:grid [&>li]:grid-cols-[1.375rem_1fr] [&>li]:items-start [&>li]:gap-2 [&>li]:leading-snug [&_b]:font-medium [&_b]:text-ink"
+      >
+        {range !== null && range.otherUnitCount > 0 ? (
+          <li>
+            <span aria-hidden className="mt-1 grid place-items-center">
+              <span className="size-2.5 rounded-full border border-muted bg-line" />
+            </span>
+            <span>
               {range.otherUnitCount === 1
                 ? `1 station reports ${String(property)} in another unit and is`
                 : `${String(range.otherUnitCount)} stations report ${String(property)} in another unit and are`}{' '}
               left off this scale and drawn as a small grey dot; the popup shows the real value.
-            </p>
-          ) : null}
-          <p>
-            Pale badge: the reading is 24 hours old or older. Small grey dot: no usable value to
-            colour. Where badges would overlap, the lower value shows as a dot until you zoom in.
-          </p>
-          {showSyncedBox ? (
-            <p>
-              Dashed box: the region in the form. Solid box: the region these stations come from.
-            </p>
-          ) : null}
-        </div>
-      </details>
+            </span>
+          </li>
+        ) : null}
+        <li>
+          <span aria-hidden className="mt-0.5 grid place-items-center">
+            <span
+              className="size-3.5 rounded-full border border-ink/40"
+              style={{ background: 'color-mix(in srgb, #fd8d3c 38%, white)' }}
+            />
+          </span>
+          <span>
+            <b>Pale badge</b> reading is 24 hours old or older.
+          </span>
+        </li>
+        <li>
+          <span aria-hidden className="mt-1 grid place-items-center">
+            <span className="size-2.5 rounded-full border border-muted bg-line" />
+          </span>
+          <span>
+            <b>Grey dot</b> no usable value. Where badges overlap, the lower value shows as a dot
+            until you zoom in.
+          </span>
+        </li>
+        {showSyncedBox ? (
+          <>
+            <li>
+              <span aria-hidden className="mt-1 grid place-items-center">
+                <span className="h-2.5 w-4.5 rounded-xs border-[1.5px] border-dashed border-accent" />
+              </span>
+              <span>
+                <b>Dashed box</b> the region in the form.
+              </span>
+            </li>
+            <li>
+              <span aria-hidden className="mt-1 grid place-items-center">
+                <span className="h-2.5 w-4.5 rounded-xs border-[1.5px] border-accent" />
+              </span>
+              <span>
+                <b>Solid box</b> the region these stations come from.
+              </span>
+            </li>
+          </>
+        ) : null}
+      </ul>
     </div>
   )
 }

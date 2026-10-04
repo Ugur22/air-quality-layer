@@ -195,6 +195,27 @@ describe('StationMap', () => {
     expect(legend).toHaveTextContent(/no usable pm25 value/i)
   })
 
+  it('keeps the marker guide closed until asked for', async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <StationMap
+        layer={layer}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        draftBbox={layer.map_layer.bbox}
+      />,
+    )
+
+    const toggle = screen.getByRole('button', { name: /marker guide/i })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/pale badge/i)).not.toBeVisible()
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText(/pale badge/i)).toBeVisible()
+  })
+
   it('draws the outline of the box in the form', () => {
     render(
       <StationMap
