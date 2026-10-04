@@ -642,6 +642,27 @@ describe('StationMap', () => {
     expect(screen.getByRole('group', { name: /legend/i })).not.toHaveTextContent(/solid box/i)
   })
 
+  it("draws the country's real border, not a box, in the national view only", () => {
+    const national = { ...layer, map_layer: { ...layer.map_layer, region_id: null } }
+    const props = { draftBbox: null, property: 'pm25', selectedId: null, onSelect: vi.fn(), now }
+    const { rerender } = render(<StationMap layer={national} {...props} />)
+
+    const country = JSON.parse(
+      screen.getByTestId('source-country').getAttribute('data-geojson') ?? '{}',
+    ) as { geometry: { type: string; coordinates: number[][][][] } }
+    expect(country.geometry.type).toBe('MultiPolygon')
+    expect(country.geometry.coordinates.length).toBeGreaterThan(1)
+    expect(country.geometry.coordinates[0]?.[0]?.length).toBeGreaterThan(5)
+
+    expect(stationsSource().features.length).toBe(national.stations.features.length)
+
+    rerender(<StationMap layer={layer} {...props} />)
+    const regionView = JSON.parse(
+      screen.getByTestId('source-country').getAttribute('data-geojson') ?? '{}',
+    ) as { features: unknown[] }
+    expect(regionView.features).toEqual([])
+  })
+
   it('moves the camera to a region when its stations arrive after the map was already showing', () => {
     const props = {
       property: 'pm25',

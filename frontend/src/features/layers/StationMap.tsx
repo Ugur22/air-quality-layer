@@ -7,6 +7,7 @@ import type { Bbox } from '@/features/regions/types'
 import { Button } from '@/components/ui/button'
 import { BASEMAP_STYLE_URL } from '@/lib/config'
 import { formatValue } from '@/lib/format'
+import netherlands from '@/features/national/netherlands.json'
 import {
   buildMapData,
   COLOUR_STOPS,
@@ -40,6 +41,10 @@ const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
 // zoom look much further out, so it goes closer; measured in a browser, not derived.
 const TILT_ZOOM_OUT = -0.8
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
+// The country's real border for the national view: Natural Earth 1:10m (public domain), cut to the
+// European mainland and islands and simplified to about 500 points. It frames the stations; the
+// stations themselves are still whatever the sources returned.
+const NETHERLANDS_OUTLINE = netherlands as GeoJSON.Feature<GeoJSON.MultiPolygon>
 
 function sameBox(a: Bbox, b: Bbox | null): boolean {
   return b !== null && a.every((v, i) => v === b[i])
@@ -397,6 +402,20 @@ export function StationMap({
               id="region-outline"
               type="line"
               paint={{ 'line-color': '#0a7570', 'line-width': 2, 'line-dasharray': [2, 2] }}
+            />
+          </Source>
+          {/* Always mounted, like the region box: a source added later would be drawn over the
+              stations. */}
+          <Source id="country" type="geojson" data={isNational ? NETHERLANDS_OUTLINE : EMPTY}>
+            <Layer
+              id="country-fill"
+              type="fill"
+              paint={{ 'fill-color': '#0a7570', 'fill-opacity': 0.06 }}
+            />
+            <Layer
+              id="country-outline"
+              type="line"
+              paint={{ 'line-color': '#0a7570', 'line-width': 2 }}
             />
           </Source>
           {showSyncedBox ? (
