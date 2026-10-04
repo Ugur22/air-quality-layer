@@ -43,44 +43,36 @@ function columnColour(
   ) as [number, number, number]
 }
 
-/** Metres across the diagonal of the box the columns have to read against. */
-function diagonalMetres([w, s, e, n]: [number, number, number, number]): number {
-  const dy = (n - s) * 111_320
-  const dx = (e - w) * 111_320 * Math.cos((((n + s) / 2) * Math.PI) / 180)
-  return Math.hypot(dx, dy)
+/** Ground metres under one screen pixel at this zoom and latitude (MapLibre's 512px tiles). */
+export function metresPerPixel({ zoom, latitude }: MapView): number {
+  return (78_271.517 * Math.cos((latitude * Math.PI) / 180)) / 2 ** zoom
 }
 
-/** Up to this size a column is a fixed share of the box; beyond it the share shrinks. */
-const FULL_SCALE_DIAGONAL = 50_000
+/** Columns are sized in screen pixels, so zooming in separates stations that overlapped before. */
+const COLUMN_RADIUS_PX = 6
+const COLUMN_MAX_HEIGHT_PX = 150
 
-/**
- * The size columns are drawn against. Linear in the box for a city or a province, but a country
- * would get columns kilometres wide that bury the stations beside them, so past
- * FULL_SCALE_DIAGONAL it grows with the square root instead.
- */
-export function columnBasis(diagonal: number): number {
-  return diagonal <= FULL_SCALE_DIAGONAL
-    ? diagonal
-    : FULL_SCALE_DIAGONAL * Math.sqrt(diagonal / FULL_SCALE_DIAGONAL)
+export interface MapView {
+  zoom: number
+  latitude: number
 }
 
 export interface ColumnLayerInput {
   data: MapStationCollection
   range: ValueRange | null
   property: string | null
-  bbox: [number, number, number, number]
+  view: MapView
   selectedId: string | null
 }
 
 /**
  * Height is the value, so it is always zero-based: a column twice as tall is a reading twice as
- * high. Size is relative to the region box (see columnBasis) so the same view works for a city, a
- * province or the whole country.
+ * high. Size follows the map zoom, so the same view works for a street, a city or a country.
  */
-export function buildColumnLayers({ data, range, property, bbox, selectedId }: ColumnLayerInput) {
-  const diagonal = columnBasis(diagonalMetres(bbox))
-  const radius = Math.max(diagonal * 0.008, 40)
-  const heightScale = range && range.max > 0 ? (diagonal * 0.12) / range.max : 0
+export function buildColumnLayers({ data, range, property, view, selectedId }: ColumnLayerInput) {
+  const metres = metresPerPixel(view)
+  const radius = metres * COLUMN_RADIUS_PX
+  const heightScale = range && range.max > 0 ? (metres * COLUMN_MAX_HEIGHT_PX) / range.max : 0
   const position = (s: Station) => s.geometry.coordinates
   const valued = data.features.filter((s) => s.properties.hasValue && s.properties.value !== null)
   const empty = data.features.filter((s) => !s.properties.hasValue)

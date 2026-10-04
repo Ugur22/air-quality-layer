@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildColumnLayers, columnBasis } from './columnLayer'
+import { buildColumnLayers, metresPerPixel } from './columnLayer'
 import type { MapStationCollection } from './mapData'
 
 const feature = (id: string, value: number | null, stale = false) => ({
@@ -18,20 +18,18 @@ function build(selectedId: string | null = null) {
     data,
     range,
     property: 'pm25',
-    bbox: [4.85, 52.35, 4.95, 52.4],
+    view: { zoom: 11, latitude: 52.37 },
     selectedId,
   })
   const byId = (id: string) => layers.find((l) => l.id === id)
   return { byId }
 }
 
-describe('columnBasis', () => {
-  it('is the box itself up to a province, then grows more slowly', () => {
-    expect(columnBasis(20_000)).toBe(20_000)
-    expect(columnBasis(50_000)).toBe(50_000)
-    // A country-sized box (about 430 km across) is not 8.6 times a province-sized one.
-    expect(columnBasis(430_000)).toBeLessThan(160_000)
-    expect(columnBasis(430_000)).toBeGreaterThan(columnBasis(200_000))
+describe('metresPerPixel', () => {
+  it('halves with every zoom level and shrinks towards the poles', () => {
+    const at = (zoom: number, latitude = 0) => metresPerPixel({ zoom, latitude })
+    expect(at(11)).toBeCloseTo(at(10) / 2)
+    expect(at(10, 60)).toBeCloseTo(at(10) / 2)
   })
 })
 

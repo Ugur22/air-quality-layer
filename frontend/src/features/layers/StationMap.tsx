@@ -25,7 +25,7 @@ import {
   valueRange,
 } from './mapData'
 import { addBadgeImage } from './badgeImage'
-import { buildColumnLayers, COLUMN_PITCH } from './columnLayer'
+import { buildColumnLayers, COLUMN_PITCH, type MapView } from './columnLayer'
 import { ColumnOverlay } from './ColumnOverlay'
 import { startRectangleDrawing } from './regionDrawing'
 import { StationTooltip } from './StationTooltip'
@@ -167,6 +167,10 @@ function Legend({
   )
 }
 
+function readView(map: { getZoom: () => number; getCenter: () => { lat: number } }): MapView {
+  return { zoom: map.getZoom(), latitude: map.getCenter().lat }
+}
+
 /**
  * The map is always on screen: before the first sync it shows the box typed in the form, so the
  * user sees where they are about to look. `layer` adds the stations of a finished sync.
@@ -204,6 +208,8 @@ export function StationMap({
   const mapRef = useRef<MapRef>(null)
   const overlayRef = useRef<MapboxOverlay>(null)
   const [columns, setColumns] = useState(false)
+  // Column size follows the zoom; it is read once a gesture settles, so a pinch does not rebuild layers.
+  const [view, setView] = useState<MapView>({ zoom: 8, latitude: 52 })
   const [pointer, setPointer] = useState(false)
   // The station under the pointer and where, for the tooltip.
   const [hover, setHover] = useState<{
@@ -252,11 +258,8 @@ export function StationMap({
     [layerBbox, showSyncedBox],
   )
   const columnLayers = useMemo(
-    () =>
-      columns && layerBbox
-        ? buildColumnLayers({ data, range, property, bbox: layerBbox, selectedId })
-        : [],
-    [columns, data, range, property, layerBbox, selectedId],
+    () => (columns ? buildColumnLayers({ data, range, property, view, selectedId }) : []),
+    [columns, data, range, property, view, selectedId],
   )
   /** The id of the station under a screen point: the style's layers, or deck.gl's columns. */
   const stationAt = (event: {
@@ -375,6 +378,10 @@ export function StationMap({
           onLoad={(event) => {
             addBadgeImage(event.target)
             setBadgeReady(true)
+            setView(readView(event.target))
+          }}
+          onMoveEnd={(event) => {
+            setView(readView(event.target))
           }}
           cursor={pointer ? 'pointer' : undefined}
           onMouseEnter={() => {

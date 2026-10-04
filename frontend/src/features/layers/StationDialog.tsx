@@ -154,7 +154,7 @@ export function StationDialog({
                   layerId={layerId}
                   stationId={station.id}
                   property={property}
-                  active={tab === 'trend'}
+                  active
                   lastReported={newest ? formatAge(newest, now) : null}
                 />
               ) : null}

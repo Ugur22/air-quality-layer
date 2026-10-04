@@ -8,4 +8,6 @@ export const FAKE_MAP = {
   fake: 'maplibre-map',
   hasImage: () => false,
   addImage: mapSpies.addImage,
+  getZoom: () => 11,
+  getCenter: () => ({ lat: 52.37 }),
 }
