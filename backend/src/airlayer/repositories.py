@@ -7,16 +7,18 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import Row, func, select, tuple_
+from sqlalchemy import ColumnElement, Row, func, select, tuple_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from airlayer.config import NATIONAL_BBOX
 from airlayer.errors import ApiError
 from airlayer.identity import RequestContext
 from airlayer.layers import LayerFilter
 from airlayer.models import (
     IN_FLIGHT_INDEX,
     AuditEvent,
+    NationalRefresh,
     Project,
     Region,
     StationReading,
@@ -27,6 +29,8 @@ from airlayer.openaq import is_missing_marker
 from airlayer.schemas import (
     MapLayerOut,
     MapLayerResponse,
+    NationalLayerOut,
+    NationalLayerResponse,
     PointGeometry,
     ProjectOut,
     ReadingOut,
@@ -287,6 +291,61 @@ async def get_map_layer(
             ).where(Region.id == job.region_id, Region.organisation_id == ctx.organisation_id)
         )
     ).one()
+    contents = await _layer_contents(session, StationReading.sync_job_id == job.id, layer_filter)
+    return MapLayerResponse(
+        map_layer=MapLayerOut(
+            id=job.id,
+            region_id=job.region_id,
+            station_count=contents.station_count,
+            bbox=[float(v) for v in bbox_row],
+            property_keys=contents.property_keys,
+        ),
+        stations=contents.stations,
+    )
+
+
+async def get_national_layer(
+    session: AsyncSession, layer_filter: LayerFilter | None
+) -> NationalLayerResponse | None:
+    """The newest succeeded national refresh (ADR 0018). Public data, so no organisation filter."""
+    refresh = await latest_succeeded_refresh(session)
+    if refresh is None or refresh.finished_at is None:
+        return None
+    contents = await _layer_contents(
+        session, StationReading.national_refresh_id == refresh.id, layer_filter
+    )
+    return NationalLayerResponse(
+        map_layer=NationalLayerOut(
+            id=refresh.id,
+            refreshed_at=refresh.finished_at,
+            station_count=contents.station_count,
+            bbox=NATIONAL_BBOX,
+            property_keys=contents.property_keys,
+        ),
+        stations=contents.stations,
+    )
+
+
+async def latest_succeeded_refresh(session: AsyncSession) -> NationalRefresh | None:
+    return await session.scalar(
+        select(NationalRefresh)
+        .where(NationalRefresh.status == SyncStatus.SUCCEEDED.value)
+        .order_by(NationalRefresh.finished_at.desc(), NationalRefresh.id)
+        .limit(1)
+    )
+
+
+@dataclass(frozen=True)
+class _LayerContents:
+    # station_count and property_keys describe the whole layer, stations only the filtered part.
+    station_count: int
+    property_keys: list[str]
+    stations: StationCollection
+
+
+async def _layer_contents(
+    session: AsyncSession, parent: ColumnElement[bool], layer_filter: LayerFilter | None
+) -> _LayerContents:
     rows = (
         await session.execute(
             select(
@@ -297,7 +356,7 @@ async def get_map_layer(
                 StationReading.readings,
                 StationReading.sources,
             )
-            .where(StationReading.sync_job_id == job.id)
+            .where(parent)
             .order_by(
                 StationReading.openaq_location_id.asc().nulls_last(),
                 StationReading.luchtmeetnet_number,
@@ -327,14 +386,9 @@ async def get_map_layer(
         for r, readings in cleaned
         if layer_filter is None or layer_filter.matches(readings)
     ]
-    return MapLayerResponse(
-        map_layer=MapLayerOut(
-            id=job.id,
-            region_id=job.region_id,
-            station_count=len(rows),
-            bbox=[float(v) for v in bbox_row],
-            property_keys=property_keys,
-        ),
+    return _LayerContents(
+        station_count=len(rows),
+        property_keys=property_keys,
         stations=StationCollection(features=features),
     )
 
@@ -351,8 +405,9 @@ async def get_history_target(
 ) -> HistoryTarget | None:
     """The OpenAQ location behind one station of a layer, and the layer's property keys.
 
-    None when the layer is not a succeeded job of this organisation, or the station is not in it,
-    so another organisation's ids are indistinguishable from unknown ones."""
+    The layer is a succeeded job of this organisation, or the newest national refresh (public data,
+    ADR 0018). None when it is neither, or the station is not in it, so another organisation's ids
+    are indistinguishable from unknown ones."""
     job_id = await session.scalar(
         select(SyncJob.id).where(
             SyncJob.id == layer_id,
@@ -360,13 +415,23 @@ async def get_history_target(
             SyncJob.status == SyncStatus.SUCCEEDED.value,
         )
     )
-    if job_id is None:
-        return None
+    if job_id is not None:
+        parent = StationReading.sync_job_id == job_id
+    else:
+        refresh_id = await session.scalar(
+            select(NationalRefresh.id).where(
+                NationalRefresh.id == layer_id,
+                NationalRefresh.status == SyncStatus.SUCCEEDED.value,
+            )
+        )
+        if refresh_id is None:
+            return None
+        parent = StationReading.national_refresh_id == refresh_id
     rows = (
         await session.execute(
             select(
                 StationReading.id, StationReading.openaq_location_id, StationReading.readings
-            ).where(StationReading.sync_job_id == job_id)
+            ).where(parent)
         )
     ).all()
     station = next((r for r in rows if r.id == station_id), None)

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildColumnLayers } from './columnLayer'
+import { buildColumnLayers, columnBasis } from './columnLayer'
 import type { MapStationCollection } from './mapData'
 
 const feature = (id: string, value: number | null, stale = false) => ({
@@ -24,6 +24,16 @@ function build(selectedId: string | null = null) {
   const byId = (id: string) => layers.find((l) => l.id === id)
   return { byId }
 }
+
+describe('columnBasis', () => {
+  it('is the box itself up to a province, then grows more slowly', () => {
+    expect(columnBasis(20_000)).toBe(20_000)
+    expect(columnBasis(50_000)).toBe(50_000)
+    // A country-sized box (about 430 km across) is not 8.6 times a province-sized one.
+    expect(columnBasis(430_000)).toBeLessThan(160_000)
+    expect(columnBasis(430_000)).toBeGreaterThan(columnBasis(200_000))
+  })
+})
 
 describe('buildColumnLayers', () => {
   it('draws a column per station with a value and a grey dot for the others', () => {

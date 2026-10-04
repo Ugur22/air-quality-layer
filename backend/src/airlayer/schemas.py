@@ -149,6 +149,22 @@ class MapLayerResponse(BaseModel):
     stations: StationCollection
 
 
+class NationalLayerOut(BaseModel):
+    """The layer of the newest national refresh (ADR 0018): no region, and a refresh time."""
+
+    id: UUID
+    region_id: None = None
+    refreshed_at: datetime
+    station_count: int
+    bbox: list[float]
+    property_keys: list[str]
+
+
+class NationalLayerResponse(BaseModel):
+    map_layer: NationalLayerOut
+    stations: StationCollection
+
+
 class SyncJobListResponse(BaseModel):
     sync_jobs: list[SyncJobOut]
     next_cursor: str | None

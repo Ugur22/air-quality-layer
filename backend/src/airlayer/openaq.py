@@ -186,19 +186,27 @@ class OpenAQClient:
         *,
         max_stations: int,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        min_interval_seconds: float = 0.0,
     ) -> None:
         self._http = http
+        # A floor between calls, for a caller that makes hundreds (ADR 0018); a sync makes few.
+        self._min_interval = min_interval_seconds
         self._max_stations = max_stations
         self._sleep = sleep
         self._pause_before_next: float = 0.0
 
     async def fetch_stations(self, bbox: list[float]) -> list[StationSnapshot]:
+        return await self._fetch_located({"bbox": ",".join(f"{v:.4f}" for v in bbox)})
+
+    async def fetch_country_stations(self, countries_id: int) -> list[StationSnapshot]:
+        """Every station OpenAQ has in one country (ADR 0018); the country, not a box, so a
+        neighbour's stations that fall inside a rectangle are not included."""
+        return await self._fetch_located({"countries_id": countries_id})
+
+    async def _fetch_located(self, selector: dict[str, Any]) -> list[StationSnapshot]:
         page = self._parse(
             _LocationsPage,
-            await self._get(
-                "/locations",
-                {"bbox": ",".join(f"{v:.4f}" for v in bbox), "limit": LOCATIONS_PAGE_SIZE},
-            ),
+            await self._get("/locations", {**selector, "limit": LOCATIONS_PAGE_SIZE}),
         )
         # Checked before the per-station calls, which are what use up the rate limit (ADR 0010).
         if (
@@ -289,6 +297,8 @@ class OpenAQClient:
             ) from None
 
     async def _get(self, path: str, params: dict[str, Any]) -> Any:
+        if self._min_interval:
+            await self._sleep(self._min_interval)
         if self._pause_before_next:
             await self._sleep(self._pause_before_next)
             self._pause_before_next = 0.0

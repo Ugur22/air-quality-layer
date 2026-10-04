@@ -50,6 +50,20 @@ function diagonalMetres([w, s, e, n]: [number, number, number, number]): number 
   return Math.hypot(dx, dy)
 }
 
+/** Up to this size a column is a fixed share of the box; beyond it the share shrinks. */
+const FULL_SCALE_DIAGONAL = 50_000
+
+/**
+ * The size columns are drawn against. Linear in the box for a city or a province, but a country
+ * would get columns kilometres wide that bury the stations beside them, so past
+ * FULL_SCALE_DIAGONAL it grows with the square root instead.
+ */
+export function columnBasis(diagonal: number): number {
+  return diagonal <= FULL_SCALE_DIAGONAL
+    ? diagonal
+    : FULL_SCALE_DIAGONAL * Math.sqrt(diagonal / FULL_SCALE_DIAGONAL)
+}
+
 export interface ColumnLayerInput {
   data: MapStationCollection
   range: ValueRange | null
@@ -60,10 +74,11 @@ export interface ColumnLayerInput {
 
 /**
  * Height is the value, so it is always zero-based: a column twice as tall is a reading twice as
- * high. Size is relative to the region box so the same view works for a city or a province.
+ * high. Size is relative to the region box (see columnBasis) so the same view works for a city, a
+ * province or the whole country.
  */
 export function buildColumnLayers({ data, range, property, bbox, selectedId }: ColumnLayerInput) {
-  const diagonal = diagonalMetres(bbox)
+  const diagonal = columnBasis(diagonalMetres(bbox))
   const radius = Math.max(diagonal * 0.008, 40)
   const heightScale = range && range.max > 0 ? (diagonal * 0.12) / range.max : 0
   const position = (s: Station) => s.geometry.coordinates

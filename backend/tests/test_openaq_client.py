@@ -412,3 +412,20 @@ async def test_http_client_sends_the_api_key_header_and_has_a_timeout() -> None:
     assert http.headers["x-api-key"] == "test-key-not-a-secret"
     assert http.timeout.read == 5
     await http.aclose()
+
+
+async def test_a_minimum_interval_is_waited_before_every_call() -> None:
+    sleeps: list[float] = []
+
+    async def record(seconds: float) -> None:
+        sleeps.append(seconds)
+
+    upstream = Upstream([location(1), location(2)])
+    http = httpx.AsyncClient(transport=httpx.MockTransport(upstream), base_url="https://x.test/v3")
+    client = OpenAQClient(http, max_stations=50, sleep=record, min_interval_seconds=1.2)
+
+    await client.fetch_country_stations(94)
+
+    # One call for the locations and one per station.
+    assert sleeps == [1.2, 1.2, 1.2]
+    assert upstream.calls[0].url.params["countries_id"] == "94"

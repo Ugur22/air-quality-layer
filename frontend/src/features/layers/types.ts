@@ -16,7 +16,10 @@ export interface StationFeature {
 export interface MapLayerResponse {
   map_layer: {
     id: string
-    region_id: string
+    /** Null for the national layer, which belongs to no region (ADR 0018). */
+    region_id: string | null
+    /** Only the national layer says when its refresh finished. */
+    refreshed_at?: string
     station_count: number
     bbox: [number, number, number, number]
     property_keys: string[]

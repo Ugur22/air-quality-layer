@@ -36,6 +36,9 @@ const FIT_PADDING_BOX = { top: 48, right: 48, bottom: 120, left: 48 }
 // The Netherlands, west/south/east/north: where the map opens when there is neither a layer nor a
 // box to look at. Nothing stops the user from going elsewhere (a place search moves the camera).
 const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
+// How far a tilted country view sits from the flat fit (negative is closer). Tilting makes the same
+// zoom look much further out, so it goes closer; measured in a browser, not derived.
+const TILT_ZOOM_OUT = -0.8
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
 
 function sameBox(a: Bbox, b: Bbox | null): boolean {
@@ -226,7 +229,9 @@ export function StationMap({
   const dotPaint = useMemo(() => stationDotPaint(range, property), [range, property])
   const region = useMemo(() => (draftBbox ? outline(draftBbox) : EMPTY), [draftBbox])
   // After a sync the form can be edited away from the region the stations belong to; both are drawn.
-  const showSyncedBox = layerBbox !== null && !sameBox(layerBbox, draftBbox)
+  // The national layer's box is only a frame for the camera; drawing it would claim a region.
+  const isNational = layer?.map_layer.region_id === null
+  const showSyncedBox = layerBbox !== null && !isNational && !sameBox(layerBbox, draftBbox)
   const syncedRegion = useMemo(
     () => (layerBbox && showSyncedBox ? outline(layerBbox) : EMPTY),
     [layerBbox, showSyncedBox],
@@ -452,7 +457,25 @@ export function StationMap({
           className="absolute right-3 top-24 z-10"
           aria-pressed={columns}
           onClick={() => {
-            mapRef.current?.easeTo({ pitch: columns ? 0 : COLUMN_PITCH, duration: 600 })
+            const pitch = columns ? 0 : COLUMN_PITCH
+            const map = mapRef.current
+            // Tilting alone pushes the far end of a country off the screen, and fitBounds at a
+            // pitch zooms out far more than needed. So: fit flat, then step back a little.
+            // A region keeps wherever the user has moved to.
+            const fit =
+              isNational && layerBbox
+                ? map?.cameraForBounds(layerBbox, { padding: FIT_PADDING_BOX })
+                : undefined
+            if (map && fit?.center && fit.zoom !== undefined) {
+              map.easeTo({
+                pitch,
+                center: fit.center,
+                zoom: fit.zoom - (pitch > 0 ? TILT_ZOOM_OUT : 0),
+                duration: 600,
+              })
+            } else {
+              map?.easeTo({ pitch, duration: 600 })
+            }
             setHover(null)
             setColumns((on) => !on)
           }}

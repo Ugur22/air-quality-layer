@@ -177,7 +177,7 @@ async def fail_job(sync_job_id: UUID, code: str, message: str) -> None:
         await session.commit()
 
 
-def _reading_json(station: StationSnapshot) -> dict[str, object]:
+def reading_json(station: StationSnapshot) -> dict[str, object]:
     return {
         name: {
             "value": r.value,
@@ -209,7 +209,7 @@ async def _finish(
                 sources=list(s.sources),
                 name=s.name,
                 geom=func.ST_SetSRID(func.ST_MakePoint(s.longitude, s.latitude), 4326),
-                readings=_reading_json(s),
+                readings=reading_json(s),
             )
             for s in stations
         )

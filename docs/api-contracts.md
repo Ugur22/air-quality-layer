@@ -224,8 +224,39 @@ Hourly values of one pollutant at one station, fetched from OpenAQ when the requ
 - Authentication as for every endpoint (dev placeholder identity, `401 unauthorized` outside development).
 - Errors: `400 validation_failed` (bad `property` or `hours`, malformed `X-Dev-Organisation-Id`), `401 unauthorized`, `404 not_found`, `503 service_unavailable`.
 
+## 8. National layer (Proposed, ADR 0018)
+
+`GET /api/v1/national-layer?property=pm25&value=10&comparator=>=`
+
+The merged stations of OpenAQ and Luchtmeetnet for the whole Netherlands, refreshed hourly by a background task; the request itself reads stored data and calls no upstream.
+
+`200 OK`: as section 4, except the layer belongs to no region and says when it was built:
+
+```json
+{
+  "map_layer": {
+    "id": "…",
+    "region_id": null,
+    "refreshed_at": "2026-10-04T12:41:07Z",
+    "station_count": 312,
+    "bbox": [3.2, 50.7, 7.3, 53.7],
+    "property_keys": ["pm25", "no2", "o3"]
+  },
+  "stations": { "type": "FeatureCollection", "features": [] }
+}
+```
+
+- `id` is the newest succeeded refresh's id. It changes with every refresh, so clients do not cache it across hours. `refreshed_at` is when that refresh finished, UTC. `region_id` is always `null` here. Section 4 layers are unchanged: they carry neither `refreshed_at` nor a null `region_id`.
+- `bbox` is the fixed Netherlands extent `[3.2, 50.7, 7.3, 53.7]`, not derived from the stations. OpenAQ is asked by country, so stations outside the country are not in the layer.
+- Features, filter, filter errors, `station_count`, `property_keys`, staleness and the missing-value marker rule are exactly as in section 4.
+- The station history endpoint (section 7) accepts this layer's `id` as `map_layer_id`.
+- `404 not_found` until a refresh has succeeded. A later failed refresh does not change the answer; the previous layer is served and its `refreshed_at` shows its age.
+- Authentication as for every endpoint. The layer is public data and is the same for every organisation.
+- Errors: `400 validation_failed` (filter), `401 unauthorized`, `404 not_found`.
+
 ## Open questions
 
+- Retention of old national refreshes is not decided (ADR 0018); all are kept.
 - Stale stations: a station that stopped reporting keeps its old readings (e.g. February data still returned in October). Clients see this through `observed_at`; whether the API should hide or flag stations older than some age is not decided.
 
 - Does the API ever expose OpenAQ's own station/location id to the client, or is it fully internal? (Internal until decided.)

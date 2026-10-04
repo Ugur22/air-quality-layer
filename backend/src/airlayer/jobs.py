@@ -4,6 +4,7 @@ import procrastinate
 from procrastinate import JobContext, RetryStrategy
 
 from airlayer.config import get_settings
+from airlayer.national import run_refresh
 from airlayer.openaq import TransientUpstreamError
 from airlayer.sync import reap_stale_jobs, run_sync
 
@@ -36,3 +37,11 @@ async def sync_region(context: JobContext, sync_job_id: str) -> None:
 @app.task(name="reap_stale_sync_jobs")
 async def reap_stale_sync_jobs(timestamp: int) -> None:
     await reap_stale_jobs()
+
+
+# Hourly, a few minutes past, since both sources publish on the hour (ADR 0018). The queueing lock
+# only stops a second refresh from being queued; two running at once are refused by the database.
+@app.periodic(cron="7 * * * *")
+@app.task(name="refresh_national", queue="national", queueing_lock="refresh_national")
+async def refresh_national(timestamp: int) -> None:
+    await run_refresh()

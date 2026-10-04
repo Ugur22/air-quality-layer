@@ -618,6 +618,30 @@ describe('StationMap', () => {
     expect(screen.getByRole('group', { name: /legend/i })).not.toHaveTextContent(/solid box/i)
   })
 
+  it('draws no box for the national layer, whose bbox only frames the camera', () => {
+    const national = {
+      ...layer,
+      map_layer: {
+        ...layer.map_layer,
+        region_id: null,
+        bbox: [3.2, 50.7, 7.3, 53.7] as [number, number, number, number],
+      },
+    }
+    render(
+      <StationMap
+        layer={national}
+        draftBbox={null}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+      />,
+    )
+
+    expect(screen.queryByTestId('source-synced')).not.toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /legend/i })).not.toHaveTextContent(/solid box/i)
+  })
+
   it('moves the camera to a region when its stations arrive after the map was already showing', () => {
     const props = {
       property: 'pm25',

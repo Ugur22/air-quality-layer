@@ -4,6 +4,9 @@ from uuid import UUID
 from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The extent the national layer reports, a little wider than the country (ADR 0018).
+NATIONAL_BBOX = [3.2, 50.7, 7.3, 53.7]
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="AIRLAYER_")
@@ -36,6 +39,18 @@ class Settings(BaseSettings):
     places_cooldown_seconds: float = 30.0
     # Starting values from ADR 0010; one sync costs 1 + N OpenAQ calls against a 60/min limit.
     max_stations_per_sync: int = 50
+    # National layer (ADR 0018): about 380 paced calls an hour, so it has its own caps and budgets.
+    # Starting values; the Netherlands had 273 OpenAQ and about 107 Luchtmeetnet stations when
+    # measured.
+    national_openaq_country_id: int = 94
+    max_stations_national: int = 600
+    # OpenAQ allows 60 calls a minute and the history endpoint shares the key, so a little under it.
+    national_openaq_interval_seconds: float = 1.2
+    # All upstream calls of one refresh; past it the refresh is failed and the old layer stays.
+    national_refresh_budget_seconds: float = 1500.0
+    national_luchtmeetnet_budget_seconds: float = 900.0
+    # A refresh still processing after this long was abandoned (dead worker).
+    national_refresh_timeout_minutes: int = 40
     # A job still queued or processing after this long was abandoned (dead worker, lost enqueue).
     sync_timeout_minutes: int = 10
     # Base of the exponential backoff between retries (2 gives 2s, 4s, 8s); tests set it to 0.

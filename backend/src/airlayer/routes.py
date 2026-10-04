@@ -19,6 +19,7 @@ from airlayer.schemas import (
     HistoryPointOut,
     HistoryResponse,
     MapLayerResponse,
+    NationalLayerResponse,
     PlaceListResponse,
     PlaceOut,
     ProjectListResponse,
@@ -180,6 +181,25 @@ async def get_map_layer(
     layer = await repo.get_map_layer(session, ctx, lid, layer_filter)
     if layer is None:
         raise repo.not_found("Map layer")
+    return layer
+
+
+@router.get("/national-layer", responses={400: _R400, 401: _R401, 404: _R404})
+async def get_national_layer(
+    ctx: Context,
+    session: Session,
+    property: Annotated[  # noqa: A002 - the public query parameter name (api-contracts.md)
+        str | None, Query(description="A pollutant from the layer's property_keys, e.g. pm25.")
+    ] = None,
+    value: Annotated[str | None, Query(description="A number such as 10 or -3.5.")] = None,
+    comparator: Annotated[
+        Comparator | None, Query(description="Defaults to = when property is given.")
+    ] = None,
+) -> NationalLayerResponse:
+    layer_filter = parse_filter(property, value, comparator)
+    layer = await repo.get_national_layer(session, layer_filter)
+    if layer is None:
+        raise repo.not_found("National layer")
     return layer
 
 

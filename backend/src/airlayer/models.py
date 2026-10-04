@@ -130,6 +130,35 @@ class SyncJob(Base):
     )
 
 
+class NationalRefresh(Base):
+    """One run of the hourly national pull (ADR 0018). Like a sync job but owned by no region."""
+
+    __tablename__ = "national_refreshes"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('processing', 'succeeded', 'failed')", name="ck_national_refreshes_status"
+        ),
+        Index("ix_national_refreshes_status_finished", "status", "finished_at"),
+        # The database, not just the task's queueing lock, guarantees one refresh at a time.
+        Index(
+            "uq_national_refreshes_one_processing",
+            "status",
+            unique=True,
+            postgresql_where=text("status = 'processing'"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    status: Mapped[str] = mapped_column(String(20), default=SyncStatus.PROCESSING.value)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    station_count: Mapped[int | None]
+    errors: Mapped[list[dict[str, str]]] = mapped_column(JSONB, server_default=text("'[]'::jsonb"))
+    warnings: Mapped[list[dict[str, str]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+
+
 class StationReading(Base):
     __tablename__ = "station_readings"
     __table_args__ = (
@@ -138,6 +167,20 @@ class StationReading(Base):
         ),
         UniqueConstraint(
             "sync_job_id", "luchtmeetnet_number", name="uq_station_readings_job_luchtmeetnet"
+        ),
+        UniqueConstraint(
+            "national_refresh_id",
+            "openaq_location_id",
+            name="uq_station_readings_refresh_location",
+        ),
+        UniqueConstraint(
+            "national_refresh_id",
+            "luchtmeetnet_number",
+            name="uq_station_readings_refresh_luchtmeetnet",
+        ),
+        CheckConstraint(
+            "(sync_job_id IS NULL) <> (national_refresh_id IS NULL)",
+            name="ck_station_readings_one_parent",
         ),
         CheckConstraint(
             "openaq_location_id IS NOT NULL OR luchtmeetnet_number IS NOT NULL",
@@ -149,7 +192,11 @@ class StationReading(Base):
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
     # Readings are only reachable through an organisation-scoped sync job lookup, so they carry
     # no organisation column of their own.
-    sync_job_id: Mapped[UUID] = mapped_column(ForeignKey("sync_jobs.id"))
+    sync_job_id: Mapped[UUID | None] = mapped_column(ForeignKey("sync_jobs.id"))
+    # A national layer's readings belong to a refresh instead of a sync job (ADR 0018).
+    national_refresh_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("national_refreshes.id"), index=True
+    )
     # A station only Luchtmeetnet has carries no OpenAQ id (ADR 0017); one of the two is always set.
     openaq_location_id: Mapped[int | None] = mapped_column(BigInteger)
     luchtmeetnet_number: Mapped[str | None] = mapped_column(Text)

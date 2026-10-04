@@ -9,6 +9,9 @@ import { EMPTY_DRAFT, type RegionFormValues } from '@/features/regions/validatio
  */
 interface SessionState {
   region: Region | null
+  /** Show the whole-country layer instead of the region being worked on (ADR 0018). */
+  nationalView: boolean
+  setNationalView: (on: boolean) => void
   syncJobId: string | null
   /** The pollutant the map colours by; null means "the layer's default". */
   colourProperty: string | null
@@ -44,6 +47,11 @@ interface SessionState {
 
 export const useSession = create<SessionState>((set) => ({
   region: null,
+  nationalView: false,
+  setNationalView: (nationalView) => {
+    // A selection or a pollutant filter from the other layer means nothing on this one.
+    set({ nationalView, selectedStationId: null, filterValue: '', colourProperty: null })
+  },
   syncJobId: null,
   colourProperty: null,
   selectedStationId: null,
@@ -96,6 +104,7 @@ export const useSession = create<SessionState>((set) => ({
   reset: () => {
     set({
       region: null,
+      nationalView: false,
       syncJobId: null,
       colourProperty: null,
       selectedStationId: null,

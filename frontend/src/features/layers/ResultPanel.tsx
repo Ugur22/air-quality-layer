@@ -1,4 +1,5 @@
-import { useCallback, useMemo, type ReactNode } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
+import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import type { Bbox } from '@/features/regions/types'
@@ -94,7 +95,23 @@ export function ResultPanel({
         : null,
     [hasLayer, property, comparator, settledValue],
   )
-  const filtered = useFilteredMapLayer(layer?.map_layer.id ?? null, filter)
+  const queryClient = useQueryClient()
+  const filtered = useFilteredMapLayer(
+    layer?.map_layer.id ?? null,
+    filter,
+    layer?.map_layer.region_id === null,
+  )
+
+  // The server rebuilds the national layer under a new id and always answers with the newest one,
+  // so a filtered answer for another id means the layer on screen is out of date: reload it.
+  const answeredFor = filter ? filtered.data?.map_layer.id : undefined
+  const shownId = layer?.map_layer.id
+  const isNational = layer?.map_layer.region_id === null
+  useEffect(() => {
+    if (isNational && answeredFor !== undefined && answeredFor !== shownId) {
+      void queryClient.invalidateQueries({ queryKey: ['national-layer'] })
+    }
+  }, [isNational, answeredFor, shownId, queryClient])
 
   // Only an answer for this very layer may decide what is shown (the previous answer is kept on
   // screen while a new one loads, and after a new sync it could belong to the old layer).
