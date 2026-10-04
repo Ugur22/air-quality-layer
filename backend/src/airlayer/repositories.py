@@ -8,10 +8,11 @@ from typing import Any
 from uuid import UUID
 
 from sqlalchemy import ColumnElement, Row, func, select, tuple_
+from sqlalchemy.dialects.postgresql import distinct_on
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from airlayer.config import NATIONAL_BBOX
+from airlayer.countries import Country, load_countries
 from airlayer.errors import ApiError
 from airlayer.identity import RequestContext
 from airlayer.layers import LayerFilter
@@ -27,6 +28,8 @@ from airlayer.models import (
 )
 from airlayer.openaq import is_missing_marker
 from airlayer.schemas import (
+    CountryListResponse,
+    CountryOut,
     MapLayerOut,
     MapLayerResponse,
     NationalLayerOut,
@@ -305,10 +308,11 @@ async def get_map_layer(
 
 
 async def get_national_layer(
-    session: AsyncSession, layer_filter: LayerFilter | None
+    session: AsyncSession, country: Country, layer_filter: LayerFilter | None
 ) -> NationalLayerResponse | None:
-    """The newest succeeded national refresh (ADR 0018). Public data, so no organisation filter."""
-    refresh = await latest_succeeded_refresh(session)
+    """The newest succeeded national refresh of a country (ADR 0018, 0019). Public data, so no
+    organisation filter."""
+    refresh = await latest_succeeded_refresh(session, country.code)
     if refresh is None or refresh.finished_at is None:
         return None
     contents = await _layer_contents(
@@ -317,21 +321,62 @@ async def get_national_layer(
     return NationalLayerResponse(
         map_layer=NationalLayerOut(
             id=refresh.id,
+            country=country.code,
             refreshed_at=refresh.finished_at,
             station_count=contents.station_count,
-            bbox=NATIONAL_BBOX,
+            bbox=country.bbox,
             property_keys=contents.property_keys,
         ),
         stations=contents.stations,
     )
 
 
-async def latest_succeeded_refresh(session: AsyncSession) -> NationalRefresh | None:
+async def latest_succeeded_refresh(
+    session: AsyncSession, country_code: str
+) -> NationalRefresh | None:
     return await session.scalar(
         select(NationalRefresh)
-        .where(NationalRefresh.status == SyncStatus.SUCCEEDED.value)
+        .where(
+            NationalRefresh.country_code == country_code,
+            NationalRefresh.status == SyncStatus.SUCCEEDED.value,
+        )
         .order_by(NationalRefresh.finished_at.desc(), NationalRefresh.id)
         .limit(1)
+    )
+
+
+async def list_countries(session: AsyncSession) -> CountryListResponse:
+    """Every country with a national layer, and when its newest succeeded refresh finished."""
+    newest = {
+        row.country_code: row
+        for row in (
+            await session.execute(
+                select(
+                    NationalRefresh.country_code,
+                    NationalRefresh.finished_at,
+                    NationalRefresh.station_count,
+                )
+                .where(NationalRefresh.status == SyncStatus.SUCCEEDED.value)
+                .order_by(
+                    NationalRefresh.country_code,
+                    NationalRefresh.finished_at.desc(),
+                    NationalRefresh.id,
+                )
+                .ext(distinct_on(NationalRefresh.country_code))
+            )
+        ).all()
+    }
+    return CountryListResponse(
+        countries=[
+            CountryOut(
+                code=c.code,
+                name=c.name,
+                bbox=c.bbox,
+                refreshed_at=newest[c.code].finished_at if c.code in newest else None,
+                station_count=newest[c.code].station_count if c.code in newest else None,
+            )
+            for c in sorted(load_countries(), key=lambda country: country.name)
+        ]
     )
 
 
@@ -405,9 +450,9 @@ async def get_history_target(
 ) -> HistoryTarget | None:
     """The OpenAQ location behind one station of a layer, and the layer's property keys.
 
-    The layer is a succeeded job of this organisation, or the newest national refresh (public data,
-    ADR 0018). None when it is neither, or the station is not in it, so another organisation's ids
-    are indistinguishable from unknown ones."""
+    The layer is a succeeded job of this organisation, or a kept succeeded national refresh
+    (public data, ADR 0018, 0019). None when it is neither, or the station is not in it, so another
+    organisation's ids are indistinguishable from unknown ones."""
     job_id = await session.scalar(
         select(SyncJob.id).where(
             SyncJob.id == layer_id,

@@ -7,7 +7,8 @@ import type { Bbox } from '@/features/regions/types'
 import { Button } from '@/components/ui/button'
 import { BASEMAP_STYLE_URL } from '@/lib/config'
 import { formatValue } from '@/lib/format'
-import netherlands from '@/features/national/netherlands.json'
+import { useCountryBorder } from '@/features/national/borders'
+import { DEFAULT_COUNTRY } from '@/features/national/types'
 import {
   buildMapData,
   COLOUR_STOPS,
@@ -41,11 +42,6 @@ const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
 // zoom look much further out, so it goes closer; measured in a browser, not derived.
 const TILT_ZOOM_OUT = -0.8
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
-// The country's real border for the national view: Natural Earth 1:10m (public domain), cut to the
-// European mainland and islands and simplified to about 500 points. It frames the stations; the
-// stations themselves are still whatever the sources returned.
-const NETHERLANDS_OUTLINE = netherlands as GeoJSON.Feature<GeoJSON.MultiPolygon>
-
 function sameBox(a: Bbox, b: Bbox | null): boolean {
   return b !== null && a.every((v, i) => v === b[i])
 }
@@ -185,6 +181,7 @@ export function StationMap({
   now,
   onBoxDrawn,
   viewRequest = null,
+  countryView = null,
 }: {
   layer: MapLayerResponse | null
   /** When a filter is active, the ids of the stations that match it; null shows all. */
@@ -198,6 +195,11 @@ export function StationMap({
   onBoxDrawn?: (bbox: Bbox) => void
   /** Moves the camera to a box (a chosen place); a request with a new id moves it again. */
   viewRequest?: { bbox: Bbox; id: number } | null
+  /**
+   * The country the country view is on. Until its layer exists (loading, or not built yet) the map
+   * shows that country's border and frames it, instead of the previous place with nothing in it.
+   */
+  countryView?: { code: string; bbox: Bbox } | null
 }) {
   const mapRef = useRef<MapRef>(null)
   const overlayRef = useRef<MapboxOverlay>(null)
@@ -236,6 +238,14 @@ export function StationMap({
   // After a sync the form can be edited away from the region the stations belong to; both are drawn.
   // The national layer's box is only a frame for the camera; drawing it would claim a region.
   const isNational = layer?.map_layer.region_id === null
+  // The country's real border frames the stations; the stations themselves are still whatever the
+  // sources returned, so none is dropped for lying just outside a simplified line.
+  const shownCountry = layer
+    ? isNational
+      ? (layer.map_layer.country ?? DEFAULT_COUNTRY)
+      : null
+    : (countryView?.code ?? null)
+  const border = useCountryBorder(shownCountry)
   const showSyncedBox = layerBbox !== null && !isNational && !sameBox(layerBbox, draftBbox)
   const syncedRegion = useMemo(
     () => (layerBbox && showSyncedBox ? outline(layerBbox) : EMPTY),
@@ -272,6 +282,16 @@ export function StationMap({
     fittedFor.current = layerId
   }, [layerId, layerBbox])
 
+  // A country whose layer is not there yet is framed by the country's own box.
+  const waitingFor = layer === null ? countryView : null
+  const waitingCode = waitingFor?.code
+  const waitingBbox = waitingFor?.bbox
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !waitingBbox) return
+    map.fitBounds(waitingBbox, { padding: FIT_PADDING_BOX, duration: 600 })
+  }, [waitingCode, waitingBbox])
+
   // A chosen place moves the camera once; a request that was already there when the map appeared
   // (a remount) does not move it again.
   const lastViewId = useRef(viewRequest?.id ?? 0)
@@ -305,7 +325,7 @@ export function StationMap({
     }
   }, [drawing, onBoxDrawn])
 
-  const startBbox = layerBbox ?? draftBbox
+  const startBbox = layerBbox ?? countryView?.bbox ?? draftBbox
   return (
     <div ref={frame} className="relative h-full overflow-hidden bg-surface">
       <div className="absolute inset-0">
@@ -406,7 +426,7 @@ export function StationMap({
           </Source>
           {/* Always mounted, like the region box: a source added later would be drawn over the
               stations. */}
-          <Source id="country" type="geojson" data={isNational ? NETHERLANDS_OUTLINE : EMPTY}>
+          <Source id="country" type="geojson" data={border ?? EMPTY}>
             <Layer
               id="country-fill"
               type="fill"

@@ -3,21 +3,25 @@ import { apiFetch } from '@/lib/api'
 import type { LayerFilter } from './filter'
 import type { MapLayerResponse, StationHistoryResponse } from './types'
 
-/** The national layer is read from its own endpoint; its id is not a sync job (ADR 0018). */
+/**
+ * A national layer is read from its own endpoint, by country; its id is not a sync job (ADR 0018,
+ * 0019). `country` is null for a region layer.
+ */
 export function getMapLayer(
   mapLayerId: string,
   filter: LayerFilter | null,
-  national = false,
+  country: string | null = null,
 ): Promise<MapLayerResponse> {
-  const query = filter
-    ? `?${new URLSearchParams({
-        property: filter.property,
-        value: filter.value,
-        comparator: filter.comparator,
-      }).toString()}`
-    : ''
+  const params = new URLSearchParams()
+  if (country) params.set('country', country)
+  if (filter) {
+    params.set('property', filter.property)
+    params.set('value', filter.value)
+    params.set('comparator', filter.comparator)
+  }
+  const query = params.size > 0 ? `?${params.toString()}` : ''
   return apiFetch<MapLayerResponse>(
-    national ? `/national-layer${query}` : `/map-layers/${mapLayerId}${query}`,
+    country ? `/national-layer${query}` : `/map-layers/${mapLayerId}${query}`,
   )
 }
 
@@ -32,13 +36,13 @@ export function useMapLayer(mapLayerId: string | null) {
 const NATIONAL_REFETCH_MS = 10 * 60 * 1000
 
 /**
- * The whole-country layer. The server rebuilds it hourly, so it is asked again now and then for
+ * A whole-country layer. The server rebuilds it hourly, so it is asked again now and then for
  * as long as the view is open rather than only once.
  */
-export function useNationalLayer(enabled: boolean) {
+export function useNationalLayer(country: string, enabled: boolean) {
   return useQuery({
-    queryKey: ['national-layer'],
-    queryFn: () => getMapLayer('', null, true),
+    queryKey: ['national-layer', country],
+    queryFn: () => getMapLayer('', null, country),
     enabled,
     refetchInterval: NATIONAL_REFETCH_MS,
   })
@@ -52,11 +56,11 @@ export function useNationalLayer(enabled: boolean) {
 export function useFilteredMapLayer(
   mapLayerId: string | null,
   filter: LayerFilter | null,
-  national = false,
+  country: string | null = null,
 ) {
   return useQuery({
     queryKey: ['map-layer', mapLayerId, filter],
-    queryFn: () => getMapLayer(mapLayerId ?? '', filter, national),
+    queryFn: () => getMapLayer(mapLayerId ?? '', filter, country),
     enabled: mapLayerId !== null && filter !== null,
     placeholderData: keepPreviousData,
   })

@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
+import { DEFAULT_COUNTRY } from '@/features/national/types'
 import type { Bbox } from '@/features/regions/types'
 import { boxProblem, draftBbox, DRAWN_AREA_NAME, isBoxEmpty } from '@/features/regions/validation'
 import { describeError } from '@/features/syncs/messages'
@@ -26,6 +27,7 @@ export function ResultPanel({
   title = 'Stations',
   loading = false,
   error = null,
+  countryView = null,
 }: {
   /** Shown at the top of the left rail, above the filter. */
   rail?: ReactNode
@@ -35,6 +37,8 @@ export function ResultPanel({
   /** Why the layer could not be loaded, already worded for the user. */
   error?: string | null
   layer: MapLayerResponse | null
+  /** The country being looked at in the country view, for framing it before its layer arrives. */
+  countryView?: { code: string; bbox: Bbox } | null
   /** When the layer was fetched: one clock for the map, the popup and the list. */
   now: Date
   /** Nothing is running or loading, so telling the user what to do next makes sense. */
@@ -99,7 +103,7 @@ export function ResultPanel({
   const filtered = useFilteredMapLayer(
     layer?.map_layer.id ?? null,
     filter,
-    layer?.map_layer.region_id === null,
+    layer?.map_layer.region_id === null ? (layer.map_layer.country ?? DEFAULT_COUNTRY) : null,
   )
 
   // The server rebuilds the national layer under a new id and always answers with the newest one,
@@ -152,6 +156,7 @@ export function ResultPanel({
             now={now}
             onBoxDrawn={writeBox}
             viewRequest={viewRequest}
+            countryView={countryView}
           />
         </section>
         <p

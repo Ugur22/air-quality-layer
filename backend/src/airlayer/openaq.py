@@ -4,7 +4,8 @@ partial result."""
 
 import asyncio
 import math
-from collections.abc import Awaitable, Callable
+import time
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Annotated, Any
@@ -13,6 +14,10 @@ import httpx
 from pydantic import AwareDatetime, BaseModel, Field, ValidationError, field_validator
 
 LOCATIONS_PAGE_SIZE = 1000
+LATEST_PAGE_SIZE = 1000
+# A guard against a pager that never ends, far above what the real lists need (world-wide pm25 is
+# about 22 pages of latest values; the largest country about 2 pages of locations).
+MAX_PAGES = 200
 # Never sleep longer than the rate-limit window itself, whatever the header claims.
 MAX_PAUSE_SECONDS = 60.0
 # OpenAQ data carries a marker where a sensor has no measurement; it is not a value. -999, -998 and
@@ -93,6 +98,8 @@ class _Coordinates(BaseModel):
 
 
 class _Parameter(BaseModel):
+    # Needed by the bulk latest-values pull (ADR 0019); a sync by box or per location never uses it.
+    id: _Id | None = None
     name: _Label
     units: _Label
 
@@ -138,6 +145,17 @@ class _Latest(BaseModel):
 
 class _LatestPage(BaseModel):
     results: list[_Latest]
+
+
+class _RawPage(BaseModel):
+    """A page whose items are looked at one by one, because only some of them are ours."""
+
+    results: list[dict[str, Any]]
+
+
+# The shapes the refresh passes between its steps (ADR 0019).
+Location = _Location
+Latest = _Latest
 
 
 class _SensorsPage(BaseModel):
@@ -186,11 +204,21 @@ class OpenAQClient:
         *,
         max_stations: int,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        clock: Callable[[], float] = time.monotonic,
         min_interval_seconds: float = 0.0,
+        retries: int = 0,
+        retry_wait_seconds: float = 2.0,
     ) -> None:
         self._http = http
         # A floor between calls, for a caller that makes hundreds (ADR 0018); a sync makes few.
         self._min_interval = min_interval_seconds
+        # A sync retries the whole job (Procrastinate); a caller with hundreds of calls to lose
+        # (the national refresh, ADR 0019) retries a failed call instead.
+        self._retries = retries
+        self._retry_wait = retry_wait_seconds
+        self._clock = clock
+        # Calls are spaced by when they start, so a slow answer already counts towards the gap.
+        self._next_start = 0.0
         self._max_stations = max_stations
         self._sleep = sleep
         self._pause_before_next: float = 0.0
@@ -198,10 +226,80 @@ class OpenAQClient:
     async def fetch_stations(self, bbox: list[float]) -> list[StationSnapshot]:
         return await self._fetch_located({"bbox": ",".join(f"{v:.4f}" for v in bbox)})
 
-    async def fetch_country_stations(self, countries_id: int) -> list[StationSnapshot]:
-        """Every station OpenAQ has in one country (ADR 0018); the country, not a box, so a
-        neighbour's stations that fall inside a rectangle are not included."""
-        return await self._fetch_located({"countries_id": countries_id})
+    async def fetch_country_locations(self, countries_id: int) -> list[Location]:
+        """Every OpenAQ location in one country, oldest id first (ADR 0019). The list is paged;
+        the cap is checked as pages arrive, before any latest values are asked for."""
+        found: list[Location] = []
+        for page_number in range(1, MAX_PAGES + 1):
+            page = self._parse(
+                _LocationsPage,
+                await self._get(
+                    "/locations",
+                    {
+                        "countries_id": countries_id,
+                        "limit": LOCATIONS_PAGE_SIZE,
+                        "page": page_number,
+                    },
+                ),
+            )
+            found.extend(page.results)
+            if len(found) > self._max_stations:
+                raise PermanentUpstreamError(
+                    "too_many_stations",
+                    f"The country contains more than {self._max_stations} stations.",
+                )
+            if len(page.results) < LOCATIONS_PAGE_SIZE:
+                break
+        else:
+            raise _invalid("OpenAQ listed more pages of locations than expected.")
+        self._check_unique(found)
+        self._check_lookup(found)
+        return sorted(found, key=lambda location: location.id)
+
+    async def fetch_latest(self, locations: Sequence[Location]) -> dict[int, Latest]:
+        """The newest value of every sensor of these locations, from the bulk endpoint.
+
+        `/parameters/{id}/latest` ignores a country, so each parameter is paged world-wide once
+        (about 22 calls for pm25) and only the wanted sensors are kept. That replaces one call per
+        station, which for Europe would take hours (ADR 0019)."""
+        self._check_lookup(locations)
+        wanted = {
+            sensor.id: sensor.parameter.id
+            for location in locations
+            for sensor in location.sensors
+            if sensor.parameter.id is not None
+        }
+        newest: dict[int, Latest] = {}
+        for parameter_id in sorted(set(wanted.values())):
+            for page_number in range(1, MAX_PAGES + 1):
+                page = self._parse(
+                    _RawPage,
+                    await self._get(
+                        f"/parameters/{parameter_id}/latest",
+                        {"limit": LATEST_PAGE_SIZE, "page": page_number},
+                    ),
+                )
+                for raw in page.results:
+                    # The page is world-wide: a malformed value of someone else's sensor is not
+                    # ours to reject. Only the sensors we asked about are validated strictly.
+                    sensor_id = raw.get("sensorsId")
+                    if not isinstance(sensor_id, int) or wanted.get(sensor_id) != parameter_id:
+                        continue
+                    item = self._parse(_Latest, raw)
+                    # A list that changes while it is paged can repeat a sensor; keep the newest.
+                    current = newest.get(item.sensorsId)
+                    if current is None or item.datetime.utc > current.datetime.utc:
+                        newest[item.sensorsId] = item
+                if len(page.results) < LATEST_PAGE_SIZE:
+                    break
+            else:
+                raise _invalid("OpenAQ returned more pages of latest values than expected.")
+        return newest
+
+    @classmethod
+    def station_of(cls, location: Location, latest: dict[int, Latest]) -> StationSnapshot:
+        items = [latest[s.id] for s in location.sensors if s.id in latest]
+        return cls._station(location, items)
 
     async def _fetch_located(self, selector: dict[str, Any]) -> list[StationSnapshot]:
         page = self._parse(
@@ -218,13 +316,25 @@ class OpenAQClient:
                 "too_many_stations",
                 f"The region contains more than {self._max_stations} stations.",
             )
-        ids = [loc.id for loc in page.results]
-        if len(set(ids)) != len(ids):
-            raise _invalid("OpenAQ returned the same location more than once.")
+        self._check_unique(page.results)
         stations = []
         for loc in sorted(page.results, key=lambda location: location.id):
             stations.append(await self._snapshot(loc))
         return stations
+
+    @staticmethod
+    def _check_lookup(locations: Sequence[Location]) -> None:
+        """The bulk endpoint is asked per parameter id, so a sensor without one cannot be read."""
+        for location in locations:
+            for sensor in location.sensors:
+                if sensor.parameter.id is None:
+                    raise _invalid(f"Sensor {sensor.id} has no parameter id.")
+
+    @staticmethod
+    def _check_unique(locations: Sequence[Location]) -> None:
+        ids = [loc.id for loc in locations]
+        if len(set(ids)) != len(ids):
+            raise _invalid("OpenAQ returned the same location more than once.")
 
     async def fetch_history(
         self, location_id: int, property_name: str, *, start: datetime, end: datetime
@@ -266,10 +376,14 @@ class OpenAQClient:
         return StationHistory(unit=sensor.parameter.units, points=points)
 
     async def _snapshot(self, loc: _Location) -> StationSnapshot:
-        sensors = {s.id: s.parameter for s in loc.sensors}
         latest = self._parse(_LatestPage, await self._get(f"/locations/{loc.id}/latest", {}))
+        return self._station(loc, latest.results)
+
+    @staticmethod
+    def _station(loc: _Location, items: Sequence[_Latest]) -> StationSnapshot:
+        sensors = {s.id: s.parameter for s in loc.sensors}
         readings: dict[str, Reading] = {}
-        for item in latest.results:
+        for item in items:
             parameter = sensors.get(item.sensorsId)
             if parameter is None:
                 raise _invalid(f"Latest value for unknown sensor {item.sensorsId}.")
@@ -297,8 +411,26 @@ class OpenAQClient:
             ) from None
 
     async def _get(self, path: str, params: dict[str, Any]) -> Any:
+        for attempt in range(self._retries + 1):
+            try:
+                return await self._get_once(path, params)
+            except TransientUpstreamError as exc:
+                if attempt == self._retries:
+                    raise
+                wait = (
+                    exc.retry_after
+                    if exc.retry_after is not None
+                    else self._retry_wait * 2**attempt
+                )
+                await self._sleep(min(wait, MAX_PAUSE_SECONDS))
+        raise AssertionError("unreachable")  # the loop returns or raises on its last attempt
+
+    async def _get_once(self, path: str, params: dict[str, Any]) -> Any:
         if self._min_interval:
-            await self._sleep(self._min_interval)
+            now = self._clock()
+            if self._next_start > now:
+                await self._sleep(self._next_start - now)
+            self._next_start = max(now, self._next_start) + self._min_interval
         if self._pause_before_next:
             await self._sleep(self._pause_before_next)
             self._pause_before_next = 0.0

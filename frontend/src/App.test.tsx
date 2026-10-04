@@ -857,51 +857,114 @@ describe('App', () => {
 
     expect(await screen.findByTestId('map')).toBeInTheDocument()
   })
-  describe('the Netherlands view', () => {
+  describe('the country view', () => {
     const national = {
       map_layer: {
         ...layer.map_layer,
         id: 'refresh-1',
         region_id: null,
+        country: 'NL',
         refreshed_at: '2026-10-03T09:00:00Z',
-        bbox: [3.2, 50.7, 7.3, 53.7] as [number, number, number, number],
+        bbox: [3.35, 50.75, 7.2, 53.51] as [number, number, number, number],
       },
       stations: layer.stations,
     }
+    const countries = {
+      countries: [
+        {
+          code: 'NL',
+          name: 'Netherlands',
+          bbox: national.map_layer.bbox,
+          refreshed_at: null,
+          station_count: null,
+        },
+        {
+          code: 'TR',
+          name: 'Turkey',
+          bbox: [25.66, 35.82, 44.81, 42.1],
+          refreshed_at: null,
+          station_count: null,
+        },
+      ],
+    }
+    const routes = {
+      ...baseRoutes,
+      'GET /api/v1/countries': () => jsonResponse(200, countries),
+      'GET /api/v1/national-layer': layerServer(national),
+    }
 
-    it('loads the national layer only when asked for and lists its stations', async () => {
-      const { calls } = mockApi({
-        ...baseRoutes,
-        'GET /api/v1/national-layer': layerServer(national),
-      })
+    it('loads a national layer only when asked for and lists its stations', async () => {
+      const { calls } = mockApi(routes)
       const user = userEvent.setup()
       renderApp()
       await screen.findByRole('form', { name: 'Region' })
       expect(calls.some((c) => c.path === '/api/v1/national-layer')).toBe(false)
+      expect(calls.some((c) => c.path === '/api/v1/countries')).toBe(false)
 
-      await user.click(screen.getByRole('button', { name: 'Netherlands' }))
+      await user.click(screen.getByRole('button', { name: 'Country' }))
 
       expect(await screen.findAllByRole('listitem')).toHaveLength(2)
       expect(screen.getByText(/updated 1 h ago/i)).toBeVisible()
+      // The Netherlands is the country shown first.
+      expect(calls.find((c) => c.path === '/api/v1/national-layer')?.search).toBe('?country=NL')
       // The region form is not part of the country view.
       expect(screen.queryByRole('form', { name: 'Region' })).not.toBeInTheDocument()
     })
 
-    it('filters through the national endpoint, not a sync job', async () => {
+    it('offers the countries the server lists and asks for the chosen one', async () => {
       const { calls } = mockApi({
-        ...baseRoutes,
-        'GET /api/v1/national-layer': layerServer(national),
+        ...routes,
+        'GET /api/v1/national-layer': (call) =>
+          call.search.includes('country=TR')
+            ? jsonResponse(200, {
+                ...national,
+                map_layer: { ...national.map_layer, id: 'refresh-tr', country: 'TR' },
+              })
+            : layerServer(national)(call),
       })
       const user = userEvent.setup()
       renderApp()
-      await user.click(await screen.findByRole('button', { name: 'Netherlands' }))
+      await user.click(await screen.findByRole('button', { name: 'Country' }))
+      const picker = await screen.findByRole('combobox', { name: 'Country' })
+      await screen.findByRole('option', { name: 'Turkey' })
+
+      await user.selectOptions(picker, 'Turkey')
+
+      await vi.waitFor(() => {
+        expect(calls.some((c) => c.search.includes('country=TR'))).toBe(true)
+      })
+      expect(await screen.findByRole('heading', { name: 'Turkey' })).toBeVisible()
+      // Turkey has no second source, so the rail does not claim one.
+      expect(screen.getByText(/OpenAQ stations across the country/i)).toBeVisible()
+    })
+
+    it('keeps the chosen country selected when the server lists none', async () => {
+      mockApi({ ...routes, 'GET /api/v1/countries': () => jsonResponse(200, { countries: [] }) })
+      const user = userEvent.setup()
+      renderApp()
+
+      await user.click(await screen.findByRole('button', { name: 'Country' }))
+
+      expect(await screen.findByRole('combobox', { name: 'Country' })).toHaveValue('NL')
+    })
+
+    it('filters through the national endpoint of the chosen country, not a sync job', async () => {
+      const { calls } = mockApi(routes)
+      const user = userEvent.setup()
+      renderApp()
+      await user.click(await screen.findByRole('button', { name: 'Country' }))
       await screen.findAllByRole('listitem')
 
       await user.type(await screen.findByLabelText(/value/i), '10')
 
       await vi.waitFor(() => {
         expect(
-          calls.some((c) => c.path === '/api/v1/national-layer' && c.search.includes('value=10')),
+          calls.some(
+            (c) =>
+              c.path === '/api/v1/national-layer' &&
+              c.search.includes('value=10') &&
+              c.search.includes('country=NL'),
+          ),
         ).toBe(true)
       })
       expect(calls.some((c) => c.path === '/api/v1/map-layers/refresh-1')).toBe(false)
@@ -909,24 +972,24 @@ describe('App', () => {
 
     it('says the layer is not built yet instead of showing an error', async () => {
       mockApi({
-        ...baseRoutes,
+        ...routes,
         'GET /api/v1/national-layer': () =>
           apiError(404, 'not_found', 'National layer was not found.'),
       })
       const user = userEvent.setup()
       renderApp()
 
-      await user.click(await screen.findByRole('button', { name: 'Netherlands' }))
+      await user.click(await screen.findByRole('button', { name: 'Country' }))
 
       expect(await screen.findByText(/has not been built yet/i)).toBeVisible()
       expect(screen.queryByText(/that was not found/i)).not.toBeInTheDocument()
     })
 
     it('goes back to the region form', async () => {
-      mockApi({ ...baseRoutes, 'GET /api/v1/national-layer': layerServer(national) })
+      mockApi(routes)
       const user = userEvent.setup()
       renderApp()
-      await user.click(await screen.findByRole('button', { name: 'Netherlands' }))
+      await user.click(await screen.findByRole('button', { name: 'Country' }))
       await screen.findAllByRole('listitem')
 
       await user.click(screen.getByRole('button', { name: 'Region' }))

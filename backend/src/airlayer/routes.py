@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from airlayer import repositories as repo
+from airlayer.countries import DEFAULT_COUNTRY, find_country
 from airlayer.db import get_session
 from airlayer.errors import ApiError
 from airlayer.history import HistoryProvider, get_history_provider
@@ -14,6 +15,7 @@ from airlayer.jobs import sync_region
 from airlayer.layers import Comparator, parse_filter
 from airlayer.places import PlaceSearch, ProviderUnavailable, RateLimited, get_place_search
 from airlayer.schemas import (
+    CountryListResponse,
     ErrorResponse,
     HistoryOut,
     HistoryPointOut,
@@ -184,10 +186,18 @@ async def get_map_layer(
     return layer
 
 
+@router.get("/countries", responses={400: _R400, 401: _R401})
+async def list_countries(ctx: Context, session: Session) -> CountryListResponse:
+    return await repo.list_countries(session)
+
+
 @router.get("/national-layer", responses={400: _R400, 401: _R401, 404: _R404})
 async def get_national_layer(
     ctx: Context,
     session: Session,
+    country: Annotated[
+        str, Query(description="An ISO code from GET /countries, e.g. NL or TR.")
+    ] = DEFAULT_COUNTRY,
     property: Annotated[  # noqa: A002 - the public query parameter name (api-contracts.md)
         str | None, Query(description="A pollutant from the layer's property_keys, e.g. pm25.")
     ] = None,
@@ -196,8 +206,11 @@ async def get_national_layer(
         Comparator | None, Query(description="Defaults to = when property is given.")
     ] = None,
 ) -> NationalLayerResponse:
+    chosen = find_country(country)
+    if chosen is None:
+        raise ApiError(400, "validation_failed", f"{country[:20]!r} is not a country with a layer.")
     layer_filter = parse_filter(property, value, comparator)
-    layer = await repo.get_national_layer(session, layer_filter)
+    layer = await repo.get_national_layer(session, chosen, layer_filter)
     if layer is None:
         raise repo.not_found("National layer")
     return layer

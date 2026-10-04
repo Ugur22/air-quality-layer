@@ -1,0 +1,486 @@
+[
+ {
+  "code": "AL",
+  "name": "Albania",
+  "openaq_id": 63,
+  "bbox": [
+   19.272,
+   39.637,
+   21.037,
+   42.655
+  ]
+ },
+ {
+  "code": "AD",
+  "name": "Andorra",
+  "openaq_id": 129,
+  "bbox": [
+   1.406,
+   42.429,
+   1.765,
+   42.649
+  ]
+ },
+ {
+  "code": "AT",
+  "name": "Austria",
+  "openaq_id": 89,
+  "bbox": [
+   9.521,
+   46.379,
+   17.148,
+   49.008
+  ]
+ },
+ {
+  "code": "BE",
+  "name": "Belgium",
+  "openaq_id": 60,
+  "bbox": [
+   2.522,
+   49.495,
+   6.375,
+   51.495
+  ]
+ },
+ {
+  "code": "BA",
+  "name": "Bosnia and Herzegovina",
+  "openaq_id": 132,
+  "bbox": [
+   15.716,
+   42.559,
+   19.619,
+   45.285
+  ]
+ },
+ {
+  "code": "BG",
+  "name": "Bulgaria",
+  "openaq_id": 110,
+  "bbox": [
+   22.345,
+   41.239,
+   28.604,
+   44.228
+  ]
+ },
+ {
+  "code": "HR",
+  "name": "Croatia",
+  "openaq_id": 103,
+  "bbox": [
+   13.501,
+   42.416,
+   19.408,
+   46.547
+  ]
+ },
+ {
+  "code": "CY",
+  "name": "Cyprus",
+  "openaq_id": 8,
+  "bbox": [
+   32.272,
+   34.625,
+   34.099,
+   35.187
+  ]
+ },
+ {
+  "code": "CZ",
+  "name": "Czech Republic",
+  "openaq_id": 49,
+  "bbox": [
+   12.076,
+   48.559,
+   18.835,
+   51.04
+  ]
+ },
+ {
+  "code": "DK",
+  "name": "Denmark",
+  "openaq_id": 71,
+  "bbox": [
+   8.094,
+   54.569,
+   15.151,
+   57.751
+  ]
+ },
+ {
+  "code": "EE",
+  "name": "Estonia",
+  "openaq_id": 51,
+  "bbox": [
+   21.832,
+   57.516,
+   28.186,
+   59.671
+  ]
+ },
+ {
+  "code": "FI",
+  "name": "Finland",
+  "openaq_id": 55,
+  "bbox": [
+   20.623,
+   59.811,
+   31.57,
+   70.075
+  ]
+ },
+ {
+  "code": "FR",
+  "name": "France",
+  "openaq_id": 22,
+  "bbox": [
+   -4.785,
+   41.366,
+   9.56,
+   51.088
+  ]
+ },
+ {
+  "code": "DE",
+  "name": "Germany",
+  "openaq_id": 50,
+  "bbox": [
+   5.852,
+   47.271,
+   15.022,
+   55.065
+  ]
+ },
+ {
+  "code": "GR",
+  "name": "Greece",
+  "openaq_id": 80,
+  "bbox": [
+   19.626,
+   34.815,
+   28.24,
+   41.75
+  ]
+ },
+ {
+  "code": "HU",
+  "name": "Hungary",
+  "openaq_id": 75,
+  "bbox": [
+   16.094,
+   45.742,
+   22.878,
+   48.569
+  ]
+ },
+ {
+  "code": "IS",
+  "name": "Iceland",
+  "openaq_id": 192,
+  "bbox": [
+   -24.54,
+   63.397,
+   -13.503,
+   66.537
+  ]
+ },
+ {
+  "code": "IE",
+  "name": "Ireland",
+  "openaq_id": 78,
+  "bbox": [
+   -10.478,
+   51.446,
+   -5.994,
+   55.386
+  ]
+ },
+ {
+  "code": "IT",
+  "name": "Italy",
+  "openaq_id": 91,
+  "bbox": [
+   6.603,
+   36.655,
+   18.516,
+   47.085
+  ]
+ },
+ {
+  "code": "JE",
+  "name": "Jersey",
+  "openaq_id": 224,
+  "bbox": [
+   -2.242,
+   49.171,
+   -2.008,
+   49.267
+  ]
+ },
+ {
+  "code": "XK",
+  "name": "Kosovo",
+  "openaq_id": 65,
+  "bbox": [
+   20.025,
+   41.844,
+   21.773,
+   43.263
+  ]
+ },
+ {
+  "code": "LV",
+  "name": "Latvia",
+  "openaq_id": 52,
+  "bbox": [
+   20.969,
+   55.667,
+   28.217,
+   58.075
+  ]
+ },
+ {
+  "code": "LT",
+  "name": "Lithuania",
+  "openaq_id": 44,
+  "bbox": [
+   20.925,
+   53.887,
+   26.801,
+   56.443
+  ]
+ },
+ {
+  "code": "LU",
+  "name": "Luxembourg",
+  "openaq_id": 58,
+  "bbox": [
+   5.715,
+   49.441,
+   6.503,
+   50.175
+  ]
+ },
+ {
+  "code": "MT",
+  "name": "Malta",
+  "openaq_id": 223,
+  "bbox": [
+   14.184,
+   35.801,
+   14.567,
+   36.076
+  ]
+ },
+ {
+  "code": "MD",
+  "name": "Moldova",
+  "openaq_id": 142,
+  "bbox": [
+   26.618,
+   45.462,
+   30.132,
+   48.486
+  ]
+ },
+ {
+  "code": "MC",
+  "name": "Monaco",
+  "openaq_id": 121,
+  "bbox": [
+   7.366,
+   43.718,
+   7.437,
+   43.764
+  ]
+ },
+ {
+  "code": "ME",
+  "name": "Montenegro",
+  "openaq_id": 131,
+  "bbox": [
+   18.434,
+   41.852,
+   20.355,
+   43.548
+  ]
+ },
+ {
+  "code": "NL",
+  "name": "Netherlands",
+  "openaq_id": 94,
+  "bbox": [
+   3.349,
+   50.75,
+   7.195,
+   53.514
+  ]
+ },
+ {
+  "code": "MK",
+  "name": "North Macedonia",
+  "openaq_id": 62,
+  "bbox": [
+   20.444,
+   40.849,
+   23.01,
+   42.37
+  ]
+ },
+ {
+  "code": "NO",
+  "name": "Norway",
+  "openaq_id": 53,
+  "bbox": [
+   4.644,
+   57.993,
+   31.077,
+   71.127
+  ]
+ },
+ {
+  "code": "PL",
+  "name": "Poland",
+  "openaq_id": 77,
+  "bbox": [
+   14.124,
+   48.994,
+   24.143,
+   54.838
+  ]
+ },
+ {
+  "code": "PT",
+  "name": "Portugal",
+  "openaq_id": 141,
+  "bbox": [
+   -9.497,
+   36.987,
+   -6.206,
+   42.154
+  ]
+ },
+ {
+  "code": "RO",
+  "name": "Romania",
+  "openaq_id": 74,
+  "bbox": [
+   20.243,
+   43.65,
+   29.7,
+   48.275
+  ]
+ },
+ {
+  "code": "SM",
+  "name": "San Marino",
+  "openaq_id": 112,
+  "bbox": [
+   12.386,
+   43.892,
+   12.492,
+   43.983
+  ]
+ },
+ {
+  "code": "RS",
+  "name": "Serbia",
+  "openaq_id": 97,
+  "bbox": [
+   18.845,
+   42.235,
+   22.985,
+   46.173
+  ]
+ },
+ {
+  "code": "SK",
+  "name": "Slovakia",
+  "openaq_id": 76,
+  "bbox": [
+   16.844,
+   47.75,
+   22.54,
+   49.602
+  ]
+ },
+ {
+  "code": "SI",
+  "name": "Slovenia",
+  "openaq_id": 104,
+  "bbox": [
+   13.365,
+   45.424,
+   16.515,
+   46.864
+  ]
+ },
+ {
+  "code": "ES",
+  "name": "Spain",
+  "openaq_id": 67,
+  "bbox": [
+   -9.292,
+   35.847,
+   4.337,
+   43.793
+  ]
+ },
+ {
+  "code": "SE",
+  "name": "Sweden",
+  "openaq_id": 54,
+  "bbox": [
+   11.108,
+   55.345,
+   24.163,
+   69.036
+  ]
+ },
+ {
+  "code": "CH",
+  "name": "Switzerland",
+  "openaq_id": 92,
+  "bbox": [
+   5.955,
+   45.821,
+   10.467,
+   47.801
+  ]
+ },
+ {
+  "code": "TR",
+  "name": "Turkey",
+  "openaq_id": 66,
+  "bbox": [
+   25.663,
+   35.82,
+   44.807,
+   42.099
+  ]
+ },
+ {
+  "code": "UA",
+  "name": "Ukraine",
+  "openaq_id": 34,
+  "bbox": [
+   22.133,
+   45.214,
+   40.16,
+   52.367
+  ]
+ },
+ {
+  "code": "GB",
+  "name": "United Kingdom",
+  "openaq_id": 79,
+  "bbox": [
+   -8.174,
+   49.959,
+   1.771,
+   60.848
+  ]
+ }
+]

@@ -11,7 +11,7 @@ Shared terms for code, API, UI copy, and docs. Use these names exactly; do not i
 | **Region** | A named area of interest within a project, defined by a bounding box, that AirLayer pulls air-quality data for. The pull-based analogue of Layerline's "dataset". |
 | **Sync job** | One attempt to pull data (OpenAQ, and Luchtmeetnet for Dutch regions, ADR 0017) for a region's bounding box and write station readings. Has a status and, on failure, errors; a succeeded job can carry warnings. Immutable record once finished. The pull-based analogue of Layerline's "import job". |
 | **Map layer** | A renderable, read-oriented view of a region's current station readings (name, feature count, style hints). |
-| **National layer** | The latest merged stations for the whole Netherlands, kept fresh by an hourly background refresh instead of a user-triggered sync. Belongs to no region or organisation (ADR 0018). |
+| **National layer** | The latest stations of one country (44 of them: every European country in OpenAQ's list, plus Turkey), kept fresh by an hourly background refresh instead of a user-triggered sync. For the Netherlands it merges OpenAQ and Luchtmeetnet; for the others it is OpenAQ only. Belongs to no region or organisation; the newest 3 succeeded refreshes of each country are kept (ADR 0018, 0019). |
 | **Station reading** | One monitoring station's geometry plus its pollutant parameter values at sync time (e.g. a GeoJSON-like point with a `{ "pm25": 12.4, "no2": 8.1 }` property map). The unit of storage and display. It records its source sync job. |
 | **Audit event** | An append-only record of who did what to which entity and when. |
 

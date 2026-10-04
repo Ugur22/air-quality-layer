@@ -131,24 +131,32 @@ class SyncJob(Base):
 
 
 class NationalRefresh(Base):
-    """One run of the hourly national pull (ADR 0018). Like a sync job but owned by no region."""
+    """One country of the hourly national pull (ADR 0018, 0019). Like a sync job but owned by no
+    region."""
 
     __tablename__ = "national_refreshes"
     __table_args__ = (
         CheckConstraint(
             "status IN ('processing', 'succeeded', 'failed')", name="ck_national_refreshes_status"
         ),
-        Index("ix_national_refreshes_status_finished", "status", "finished_at"),
-        # The database, not just the task's queueing lock, guarantees one refresh at a time.
         Index(
-            "uq_national_refreshes_one_processing",
+            "ix_national_refreshes_country_status_finished",
+            "country_code",
             "status",
+            "finished_at",
+        ),
+        # The database, not just the task's queueing lock, guarantees one refresh of a country at
+        # a time.
+        Index(
+            "uq_national_refreshes_one_processing_per_country",
+            "country_code",
             unique=True,
             postgresql_where=text("status = 'processing'"),
         ),
     )
 
     id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    country_code: Mapped[str] = mapped_column(String(2))
     status: Mapped[str] = mapped_column(String(20), default=SyncStatus.PROCESSING.value)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

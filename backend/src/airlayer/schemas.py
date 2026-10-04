@@ -150,10 +150,12 @@ class MapLayerResponse(BaseModel):
 
 
 class NationalLayerOut(BaseModel):
-    """The layer of the newest national refresh (ADR 0018): no region, and a refresh time."""
+    """The layer of a country's newest national refresh (ADR 0018, 0019): no region, a country and
+    a refresh time."""
 
     id: UUID
     region_id: None = None
+    country: str
     refreshed_at: datetime
     station_count: int
     bbox: list[float]
@@ -163,6 +165,18 @@ class NationalLayerOut(BaseModel):
 class NationalLayerResponse(BaseModel):
     map_layer: NationalLayerOut
     stations: StationCollection
+
+
+class CountryOut(BaseModel):
+    code: str
+    name: str
+    bbox: list[float]
+    refreshed_at: datetime | None
+    station_count: int | None
+
+
+class CountryListResponse(BaseModel):
+    countries: list[CountryOut]
 
 
 class SyncJobListResponse(BaseModel):

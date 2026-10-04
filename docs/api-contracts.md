@@ -224,42 +224,65 @@ Hourly values of one pollutant at one station, fetched from OpenAQ when the requ
 - Authentication as for every endpoint (dev placeholder identity, `401 unauthorized` outside development).
 - Errors: `400 validation_failed` (bad `property` or `hours`, malformed `X-Dev-Organisation-Id`), `401 unauthorized`, `404 not_found`, `503 service_unavailable`.
 
-## 8. National layer (Proposed, ADR 0018)
+## 8. National layers (Proposed, ADR 0018 and 0019)
 
-`GET /api/v1/national-layer?property=pm25&value=10&comparator=>=`
+One layer per country, refreshed hourly by a background task. Requests read stored data and call no upstream.
 
-The merged stations of OpenAQ and Luchtmeetnet for the whole Netherlands, refreshed hourly by a background task; the request itself reads stored data and calls no upstream.
+### `GET /api/v1/countries`
 
-`200 OK`: as section 4, except the layer belongs to no region and says when it was built:
+The countries that have a national layer: every European country in OpenAQ's country list, plus Turkey, minus Russia (Proposed, ADR 0019). The list is fixed data shipped with the server, not typed per request.
+
+`200 OK`:
+
+```json
+{
+  "countries": [
+    { "code": "NL", "name": "Netherlands", "bbox": [3.35, 50.75, 7.2, 53.51], "refreshed_at": "2026-10-04T12:41:07Z", "station_count": 295 },
+    { "code": "TR", "name": "Turkey", "bbox": [25.66, 35.82, 44.81, 42.1], "refreshed_at": null, "station_count": null }
+  ]
+}
+```
+
+- Ordered by `name`. `code` is the ISO 3166-1 alpha-2 code, upper case. `bbox` is `[min_lon, min_lat, max_lon, max_lat]` of the country's European mainland and nearby islands, for framing the camera; it is not a region and is not subject to the 2 degree cap. Overseas territories (the Canary Islands, Azores, Madeira, Svalbard, French overseas departments) are outside it and outside the drawn border, so a station there is in the layer but not in the frame.
+- `refreshed_at` and `station_count` describe the newest succeeded refresh of that country, and are `null` until one has succeeded.
+- Errors: `400 validation_failed` (malformed `X-Dev-Organisation-Id`), `401 unauthorized`.
+
+### `GET /api/v1/national-layer?country=NL&property=pm25&value=10&comparator=>=`
+
+The stations of one country, from the newest succeeded refresh of that country.
+
+- `country` is optional, an ISO code from `GET /countries`, case-insensitive; default `NL`. An unknown code is `400 validation_failed`.
+- `200 OK`: as section 4, except the layer belongs to no region and says when it was built:
 
 ```json
 {
   "map_layer": {
     "id": "…",
     "region_id": null,
+    "country": "NL",
     "refreshed_at": "2026-10-04T12:41:07Z",
     "station_count": 312,
-    "bbox": [3.2, 50.7, 7.3, 53.7],
+    "bbox": [3.35, 50.75, 7.2, 53.51],
     "property_keys": ["pm25", "no2", "o3"]
   },
   "stations": { "type": "FeatureCollection", "features": [] }
 }
 ```
 
-- `id` is the newest succeeded refresh's id. It changes with every refresh, so clients do not cache it across hours. `refreshed_at` is when that refresh finished, UTC. `region_id` is always `null` here. Section 4 layers are unchanged: they carry neither `refreshed_at` nor a null `region_id`.
-- `bbox` is the fixed Netherlands extent `[3.2, 50.7, 7.3, 53.7]`, not derived from the stations. OpenAQ is asked by country, so stations outside the country are not in the layer.
-- Features, filter, filter errors, `station_count`, `property_keys`, staleness and the missing-value marker rule are exactly as in section 4.
+- `id` is the newest succeeded refresh's id for that country. It changes with every refresh, so clients do not cache it across hours. `refreshed_at` is when that refresh finished, UTC. `region_id` is always `null` here. `country` is additive. Section 4 layers carry none of `country`, `refreshed_at` or a null `region_id`.
+- `bbox` is the country's box from `GET /countries`, not derived from the stations. The data is pulled by country, so a neighbour's stations are not in the layer.
+- Features, filter, filter errors, `station_count`, `property_keys`, staleness and the missing-value marker rule are exactly as in section 4. Stations of the Netherlands may carry Luchtmeetnet data (ADR 0017); every other country is OpenAQ only.
 - The station history endpoint (section 7) accepts this layer's `id` as `map_layer_id`.
-- `404 not_found` until a refresh has succeeded. A later failed refresh does not change the answer; the previous layer is served and its `refreshed_at` shows its age.
+- `404 not_found` until a refresh of that country has succeeded. A later failed refresh does not change the answer; the previous layer is served and its `refreshed_at` shows its age.
+- The server keeps the newest 3 succeeded refreshes of each country and deletes older ones (ADR 0019), so a layer `id` older than that stops resolving.
 - Authentication as for every endpoint. The layer is public data and is the same for every organisation.
-- Errors: `400 validation_failed` (filter), `401 unauthorized`, `404 not_found`.
+- Errors: `400 validation_failed` (country, filter), `401 unauthorized`, `404 not_found`.
 
 ## Open questions
 
-- Retention of old national refreshes is not decided (ADR 0018); all are kept.
 - Stale stations: a station that stopped reporting keeps its old readings (e.g. February data still returned in October). Clients see this through `observed_at`; whether the API should hide or flag stations older than some age is not decided.
 
 - Does the API ever expose OpenAQ's own station/location id to the client, or is it fully internal? (Internal until decided.)
 - Real authentication scheme (replaces the dev identity via a later ADR).
-- Antimeridian-crossing regions.
+- Antimeridian-crossing regions (Russia has no national layer for this reason, ADR 0019).
 - A bbox-capable OpenAQ latest-values endpoint, which would lift the 1 + N call cost behind the station cap (ADR 0010 follow-up).

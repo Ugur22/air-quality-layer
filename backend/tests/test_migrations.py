@@ -151,3 +151,33 @@ def test_readings_stored_before_the_second_source_read_as_openaq_and_a_downgrade
     alembic("downgrade", "0003")
     with psycopg.connect(MIGRATION_URL) as conn:
         assert conn.execute("SELECT openaq_location_id FROM station_readings").fetchall() == [(7,)]
+
+
+def test_refreshes_stored_before_countries_are_the_netherlands_and_a_downgrade_keeps_them(
+    migration_db: None,
+) -> None:
+    alembic("upgrade", "0005")
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        conn.execute(
+            "INSERT INTO national_refreshes (id, status) "
+            "VALUES ('00000000-0000-4000-8000-0000000000f1', 'succeeded')"
+        )
+
+    alembic("upgrade", "head")
+
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        assert conn.execute("SELECT country_code FROM national_refreshes").fetchall() == [("NL",)]
+        conn.execute(
+            "INSERT INTO national_refreshes (id, status, country_code) "
+            "VALUES ('00000000-0000-4000-8000-0000000000f2', 'succeeded', 'TR')"
+        )
+
+    # A Turkish refresh has no place in the single national layer, so a downgrade stops.
+    with pytest.raises(subprocess.CalledProcessError):
+        alembic("downgrade", "0005")
+    with psycopg.connect(MIGRATION_URL, autocommit=True) as conn:
+        conn.execute("DELETE FROM national_refreshes WHERE country_code = 'TR'")
+
+    alembic("downgrade", "0005")
+    with psycopg.connect(MIGRATION_URL) as conn:
+        assert conn.execute("SELECT status FROM national_refreshes").fetchall() == [("succeeded",)]

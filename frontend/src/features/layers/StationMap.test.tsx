@@ -17,6 +17,14 @@ function stationsSource(): { features: { properties: Record<string, unknown> }[]
   }
 }
 
+/** The country border source: a single feature once its file has loaded, otherwise empty. */
+function countrySource(): { features: unknown[] } {
+  const data = JSON.parse(
+    screen.getByTestId('source-country').getAttribute('data-geojson') ?? '{}',
+  ) as { type?: string }
+  return { features: data.type === 'Feature' ? [data] : [] }
+}
+
 beforeEach(() => {
   mapSpies.fitBounds.mockClear()
   mapSpies.addImage.mockClear()
@@ -642,25 +650,80 @@ describe('StationMap', () => {
     expect(screen.getByRole('group', { name: /legend/i })).not.toHaveTextContent(/solid box/i)
   })
 
-  it("draws the country's real border, not a box, in the national view only", () => {
-    const national = { ...layer, map_layer: { ...layer.map_layer, region_id: null } }
+  it("draws the country's real border, not a box, in the national view only", async () => {
+    const national = { ...layer, map_layer: { ...layer.map_layer, region_id: null, country: 'TR' } }
     const props = { draftBbox: null, property: 'pm25', selectedId: null, onSelect: vi.fn(), now }
     const { rerender } = render(<StationMap layer={national} {...props} />)
 
-    const country = JSON.parse(
-      screen.getByTestId('source-country').getAttribute('data-geojson') ?? '{}',
-    ) as { geometry: { type: string; coordinates: number[][][][] } }
-    expect(country.geometry.type).toBe('MultiPolygon')
-    expect(country.geometry.coordinates.length).toBeGreaterThan(1)
-    expect(country.geometry.coordinates[0]?.[0]?.length).toBeGreaterThan(5)
-
+    // The border of each country is loaded when it is shown.
+    await vi.waitFor(() => {
+      expect(countrySource().features).toHaveLength(1)
+    })
+    const [border] = countrySource().features as unknown as {
+      properties: { code: string }
+      geometry: { type: string; coordinates: number[][][][] }
+    }[]
+    expect(border?.properties.code).toBe('TR')
+    expect(border?.geometry.type).toBe('MultiPolygon')
+    expect(border?.geometry.coordinates[0]?.[0]?.length).toBeGreaterThan(5)
     expect(stationsSource().features.length).toBe(national.stations.features.length)
 
     rerender(<StationMap layer={layer} {...props} />)
-    const regionView = JSON.parse(
-      screen.getByTestId('source-country').getAttribute('data-geojson') ?? '{}',
-    ) as { features: unknown[] }
-    expect(regionView.features).toEqual([])
+    expect(countrySource().features).toEqual([])
+  })
+
+  it("shows a country's border and frames it while its layer is not there yet", async () => {
+    const turkey = [25.66, 35.82, 44.81, 42.1] as [number, number, number, number]
+    render(
+      <StationMap
+        layer={null}
+        draftBbox={null}
+        property={null}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+        countryView={{ code: 'TR', bbox: turkey }}
+      />,
+    )
+
+    await vi.waitFor(() => {
+      expect(countrySource().features).toHaveLength(1)
+    })
+    expect(mapSpies.fitBounds).toHaveBeenCalledWith(turkey, expect.anything())
+  })
+
+  it('draws no border without a layer or a country to look at', () => {
+    render(
+      <StationMap
+        layer={null}
+        draftBbox={null}
+        property={null}
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+      />,
+    )
+
+    expect(countrySource().features).toEqual([])
+  })
+
+  it('draws the Netherlands when the layer does not name its country', async () => {
+    const national = { ...layer, map_layer: { ...layer.map_layer, region_id: null } }
+
+    render(
+      <StationMap
+        layer={national}
+        draftBbox={null}
+        property="pm25"
+        selectedId={null}
+        onSelect={vi.fn()}
+        now={now}
+      />,
+    )
+
+    await vi.waitFor(() => {
+      expect(countrySource().features).toHaveLength(1)
+    })
   })
 
   it('moves the camera to a region when its stations arrive after the map was already showing', () => {

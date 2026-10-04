@@ -18,6 +18,8 @@ export interface MapLayerResponse {
     id: string
     /** Null for the national layer, which belongs to no region (ADR 0018). */
     region_id: string | null
+    /** Only a national layer names its country (ISO code, ADR 0019). */
+    country?: string
     /** Only the national layer says when its refresh finished. */
     refreshed_at?: string
     station_count: number

@@ -3,7 +3,8 @@ import { RegionForm } from '@/features/regions/RegionForm'
 import { useProjects } from '@/features/projects/api'
 import { ResultPanel } from '@/features/layers/ResultPanel'
 import { useMapLayer, useNationalLayer } from '@/features/layers/api'
-import { NationalNotes, ViewSwitch } from '@/features/national/NationalView'
+import { useCountries } from '@/features/national/api'
+import { CountryPicker, NationalNotes, ViewSwitch } from '@/features/national/NationalView'
 import { ApiError } from '@/lib/api'
 import { isInFlight, useSyncJob } from '@/features/syncs/api'
 import { SyncStatus } from '@/features/syncs/SyncStatus'
@@ -20,7 +21,12 @@ export default function App() {
   const national = useSession((s) => s.nationalView)
   const setNational = useSession((s) => s.setNationalView)
   const regionLayer = useMapLayer(job?.status === 'succeeded' ? job.map_layer_id : null)
-  const nationalLayer = useNationalLayer(national)
+  const country = useSession((s) => s.country)
+  const setCountry = useSession((s) => s.setCountry)
+  const countries = useCountries(national)
+  const chosenCountry = countries.data?.find((c) => c.code === country)
+  const countryName = chosenCountry?.name ?? country
+  const nationalLayer = useNationalLayer(country, national)
   const layer = national ? nationalLayer : regionLayer
   const notBuiltYet =
     national && nationalLayer.error instanceof ApiError && nationalLayer.error.status === 404
@@ -38,7 +44,9 @@ export default function App() {
   const nationalSection = (
     <div className="flex flex-col gap-5">
       {switcher}
+      <CountryPicker countries={countries.data} code={country} onChange={setCountry} />
       <NationalNotes
+        country={{ code: country, name: countryName }}
         layer={nationalLayer.data ?? null}
         loading={nationalLayer.isLoading}
         notBuiltYet={notBuiltYet}
@@ -91,7 +99,7 @@ export default function App() {
         <div className="flex items-baseline gap-4 px-4 py-3">
           <h1 className="font-display text-xl font-bold tracking-tight">AirLayer</h1>
           <p className="text-sm text-muted">
-            Air-quality stations for any region you define, or the whole Netherlands
+            Air-quality stations for any region you define, or a whole country
           </p>
         </div>
       </header>
@@ -99,10 +107,11 @@ export default function App() {
       <main className="min-h-0 flex-1">
         <ResultPanel
           rail={national ? nationalSection : regionSection}
-          title={national ? 'Netherlands' : region ? region.name : 'Stations'}
+          title={national ? countryName : region ? region.name : 'Stations'}
           loading={layer.isLoading}
           error={layer.isError && !notBuiltYet ? describeError(layer.error) : null}
           layer={layer.data ?? null}
+          countryView={national && chosenCountry ? chosenCountry : null}
           now={now}
           idle={!national && !busy && !layer.isLoading && !layer.isError}
         />
