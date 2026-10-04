@@ -35,6 +35,10 @@ import type { MapLayerResponse } from './types'
 const TOOLTIP_ROOM = { width: 260, height: 100 }
 // The legend floats over the bottom-left corner, so a fitted region leaves room under it.
 const FIT_PADDING_BOX = { top: 48, right: 48, bottom: 120, left: 48 }
+// A move to another place is a fly-over: the camera zooms out, travels and zooms back in
+// (fitBounds without `linear` is MapLibre's flyTo). The time follows the distance, capped, and
+// MapLibre skips the animation for users who prefer reduced motion.
+const FLY_OVER = { speed: 1.1, maxDuration: 3500 }
 // The Netherlands, west/south/east/north: where the map opens when there is neither a layer nor a
 // box to look at. Nothing stops the user from going elsewhere (a place search moves the camera).
 const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
@@ -281,7 +285,7 @@ export function StationMap({
   useEffect(() => {
     const map = mapRef.current
     if (layerId === null || layerId === fittedFor.current || !map || !layerBbox) return
-    map.fitBounds(layerBbox, { padding: FIT_PADDING_BOX, duration: 0 })
+    map.fitBounds(layerBbox, { padding: FIT_PADDING_BOX, ...FLY_OVER })
     fittedFor.current = layerId
   }, [layerId, layerBbox])
 
@@ -292,7 +296,7 @@ export function StationMap({
   useEffect(() => {
     const map = mapRef.current
     if (!map || !waitingBbox) return
-    map.fitBounds(waitingBbox, { padding: FIT_PADDING_BOX, duration: 600 })
+    map.fitBounds(waitingBbox, { padding: FIT_PADDING_BOX, ...FLY_OVER })
   }, [waitingCode, waitingBbox])
 
   // A chosen place moves the camera once; a request that was already there when the map appeared
@@ -301,7 +305,7 @@ export function StationMap({
   useEffect(() => {
     const map = mapRef.current
     if (!viewRequest || viewRequest.id === lastViewId.current || !map) return
-    map.fitBounds(viewRequest.bbox, { padding: FIT_PADDING_BOX, duration: 600 })
+    map.fitBounds(viewRequest.bbox, { padding: FIT_PADDING_BOX, ...FLY_OVER })
     lastViewId.current = viewRequest.id
   }, [viewRequest])
 

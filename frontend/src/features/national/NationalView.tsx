@@ -1,8 +1,9 @@
+import { Command } from 'cmdk'
+import { useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { formatAge } from '@/lib/freshness'
 import { cn } from '@/lib/utils'
-import { Label } from '@/components/ui/label'
 import type { MapLayerResponse } from '@/features/layers/types'
 import type { Country } from './types'
 
@@ -50,29 +51,71 @@ export function CountryPicker({
   code: string
   onChange: (code: string) => void
 }) {
-  // The chosen code is always an option, so the select never looks empty or shows another country
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  // The chosen code is always an option, so the box never looks empty or shows another country
   // while the list is loading, empty, or does not contain it.
   const listed = countries ?? []
   const options = listed.some((country) => country.code === code)
     ? listed
     : [{ code, name: code }, ...listed]
+  const chosen = options.find((country) => country.code === code)?.name ?? code
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor="country">Country</Label>
-      <select
-        id="country"
-        value={code}
-        onChange={(e) => {
-          onChange(e.target.value)
+      <span aria-hidden className="text-sm font-medium leading-none text-ink">
+        Country
+      </span>
+      <Command
+        label="Country"
+        className="relative"
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setOpen(false)
         }}
-        className="h-10 rounded-md border border-line bg-surface px-3 text-sm text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        onBlur={(event) => {
+          // Clicking an option moves focus inside the box; only leaving it closes the list.
+          if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false)
+        }}
       >
-        {options.map((country) => (
-          <option key={country.code} value={country.code}>
-            {country.name}
-          </option>
-        ))}
-      </select>
+        <Command.Input
+          // Closed, the box names the country shown; open, it is the search text.
+          value={open ? search : chosen}
+          placeholder={open ? chosen : undefined}
+          onValueChange={(value) => {
+            setSearch(value)
+            setOpen(true)
+          }}
+          onFocus={() => {
+            setSearch('')
+            setOpen(true)
+          }}
+          onClick={() => {
+            setOpen(true)
+          }}
+          className="flex h-10 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+        />
+        {open ? (
+          <Command.List className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-line bg-surface p-1 shadow-md">
+            <Command.Empty className="px-3 py-2 text-sm text-muted">
+              No country found.
+            </Command.Empty>
+            {options.map((country) => (
+              <Command.Item
+                key={country.code}
+                value={country.name}
+                keywords={[country.code]}
+                onSelect={() => {
+                  onChange(country.code)
+                  setOpen(false)
+                }}
+                className="flex cursor-pointer items-baseline justify-between gap-3 rounded px-3 py-2 text-sm aria-selected:bg-accent-soft"
+              >
+                <span className={cn(country.code === code && 'font-semibold')}>{country.name}</span>
+                <span className="font-mono text-xs text-muted">{country.code}</span>
+              </Command.Item>
+            ))}
+          </Command.List>
+        ) : null}
+      </Command>
     </div>
   )
 }

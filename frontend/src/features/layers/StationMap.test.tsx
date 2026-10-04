@@ -744,7 +744,7 @@ describe('StationMap', () => {
       [4.85, 52.35, 4.95, 52.4],
       expect.objectContaining({
         padding: { top: 48, right: 48, bottom: 120, left: 48 },
-        duration: 0,
+        maxDuration: 3500,
       }),
     )
   })

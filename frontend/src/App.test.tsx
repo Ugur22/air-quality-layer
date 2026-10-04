@@ -926,9 +926,11 @@ describe('App', () => {
       renderApp()
       await user.click(await screen.findByRole('button', { name: 'Country' }))
       const picker = await screen.findByRole('combobox', { name: 'Country' })
-      await screen.findByRole('option', { name: 'Turkey' })
 
-      await user.selectOptions(picker, 'Turkey')
+      await user.click(picker)
+      await user.type(picker, 'turk')
+      expect(screen.queryByRole('option', { name: /Netherlands/ })).not.toBeInTheDocument()
+      await user.click(await screen.findByRole('option', { name: /Turkey/ }))
 
       await vi.waitFor(() => {
         expect(calls.some((c) => c.search.includes('country=TR'))).toBe(true)
