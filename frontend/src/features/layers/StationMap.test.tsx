@@ -131,7 +131,7 @@ describe('StationMap', () => {
     )
 
     expect(screen.getByTestId('map').getAttribute('data-interactive')).toBe(
-      'stations stations-dot stations-empty',
+      'stations stations-stale stations-dot stations-empty',
     )
   })
 

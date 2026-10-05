@@ -16,12 +16,14 @@ import {
   HAS_VALUE_FILTER,
   NO_VALUE_FILTER,
   STALE_DOT_FILTER,
+  STATION_BADGE_LAYOUT,
   STATION_DOT_EDGE_PAINT,
   STATION_DOT_LAYOUT,
   STATION_EMPTY_PAINT,
   STATION_EMPTY_SELECTED_PAINT,
   STATION_SELECTED_PAINT,
-  stationBadgeLayout,
+  stationBadgeFilter,
+  staleBadgeLayer,
   stationBadgePaint,
   stationDotPaint,
   valueRange,
@@ -313,7 +315,8 @@ export function StationMap({
     [visible, stations, property, now],
   )
   const range = useMemo(() => valueRange(stations, property), [stations, property])
-  const badgeLayout = useMemo(() => stationBadgeLayout(range, property), [range, property])
+  const badgeFilter = useMemo(() => stationBadgeFilter(range, property), [range, property])
+  const staleBadge = useMemo(() => staleBadgeLayer(range, property), [range, property])
   const paint = useMemo(() => stationBadgePaint(range, property), [range, property])
   const dotPaint = useMemo(() => stationDotPaint(range, property), [range, property])
   const region = useMemo(() => (draftBbox ? outline(draftBbox) : EMPTY), [draftBbox])
@@ -450,7 +453,9 @@ export function StationMap({
               ? { bounds: startBbox, fitBoundsOptions: { padding: FIT_PADDING_BOX } }
               : { bounds: NETHERLANDS_BOUNDS, fitBoundsOptions: { padding: 16 } }
           }
-          interactiveLayerIds={columns ? [] : ['stations', 'stations-dot', 'stations-empty']}
+          interactiveLayerIds={
+            columns ? [] : ['stations', 'stations-stale', 'stations-dot', 'stations-empty']
+          }
           onLoad={(event) => {
             addBadgeImage(event.target)
             setBadgeReady(true)
@@ -569,12 +574,21 @@ export function StationMap({
                 filter={NO_VALUE_FILTER}
                 paint={STATION_EMPTY_PAINT}
               />
+              {badgeReady && staleBadge ? (
+                <Layer
+                  id="stations-stale"
+                  type="symbol"
+                  filter={staleBadge.filter}
+                  layout={staleBadge.layout}
+                  paint={staleBadge.paint}
+                />
+              ) : null}
               {badgeReady ? (
                 <Layer
                   id="stations"
                   type="symbol"
-                  filter={HAS_VALUE_FILTER}
-                  layout={badgeLayout}
+                  filter={badgeFilter}
+                  layout={STATION_BADGE_LAYOUT}
                   paint={paint}
                 />
               ) : null}

@@ -35,9 +35,9 @@ export function badgePixels(): { width: number; height: number; data: Uint8Clamp
 // same ink edge a current badge has. It is drawn in full colour here, not as an SDF, because an SDF
 // has one fill and one halo and cannot hold white inside, a class colour and ink outside. It is
 // opaque so the station's dot underneath does not show through it. Sizes are image pixels (2 per
-// CSS pixel); together they match the 1.5 px halo a current badge draws outside its edge.
-const EDGE = 3
-const INK_WIDTH = 2.5
+// CSS pixel); the ink edge matches the 1.5 image px halo a current badge draws outside its edge.
+const EDGE = 1.5
+const INK_WIDTH = 1.5
 const RING_WIDTH = 3
 const INK = [0x12, 0x20, 0x1f] as const
 const WHITE = [255, 255, 255] as const

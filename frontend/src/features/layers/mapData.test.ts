@@ -11,7 +11,9 @@ import {
   pickColourProperty,
   stationBadgePaint,
   stationFill,
-  stationBadgeLayout,
+  stationBadgeFilter,
+  staleBadgeLayer,
+  STATION_BADGE_LAYOUT,
   STALE_DOT_FILTER,
   STATION_DOT_EDGE_PAINT,
   staleBadgeImage,
@@ -219,9 +221,11 @@ describe('stationBadgePaint', () => {
           id: 'stations',
           type: 'symbol',
           source: 's',
-          layout: stationBadgeLayout(range, property),
+          filter: stationBadgeFilter(range, property),
+          layout: STATION_BADGE_LAYOUT,
           paint: stationBadgePaint(range, property),
         },
+        ...staleLayers(range, property),
         { id: 'empty', type: 'circle', source: 's', paint: STATION_EMPTY_PAINT },
         {
           id: 'dot-edge',
@@ -241,6 +245,10 @@ describe('stationBadgePaint', () => {
     })
   }
   const base = { unit: 'µg/m³', otherUnitCount: 0 }
+  function staleLayers(range: ReturnType<typeof valueRange>, property: string | null) {
+    const stale = staleBadgeLayer(range, property)
+    return stale === null ? [] : [{ id: 'stale', type: 'symbol' as const, source: 's', ...stale }]
+  }
 
   it.each([
     ['a normal range', { min: 7.6, max: 36.4, ...base }],
@@ -308,16 +316,23 @@ describe('stationBadgePaint', () => {
   })
 })
 
-describe('stationBadgeLayout', () => {
+describe('STATION_DOT_EDGE_PAINT', () => {
+  it('reaches past a stale dot’s radius and ring, or its ink edge is hidden under the ring', () => {
+    const dot = stationDotPaint({ min: 3, max: 90, unit: 'µg/m³', otherUnitCount: 0 }, 'pm25')
+
+    expect(STATION_DOT_EDGE_PAINT?.['circle-radius']).toBeGreaterThan(
+      (dot?.['circle-radius'] as number) + 3,
+    )
+  })
+})
+
+describe('staleBadgeLayer', () => {
   const base = { unit: 'µg/m³', otherUnitCount: 0 }
-  const image = (range: Parameters<typeof stationBadgeLayout>[0], property: string | null) =>
-    stationBadgeLayout(range, property)?.['icon-image'] as unknown[]
+  const icon = (property: string) =>
+    staleBadgeLayer({ min: 3, max: 90, ...base }, property)?.layout?.['icon-image']
 
-  it('picks the hollow badge of the reading’s class for a stale reading', () => {
-    const [, , stale, fresh] = image({ min: 3, max: 90, ...base }, 'pm25')
-
-    expect(fresh).toBe('station-badge')
-    expect(stale).toEqual([
+  it('picks the hollow badge of the reading’s class', () => {
+    expect(icon('pm25')).toEqual([
       'case',
       ['<=', ['get', 'value'], 15],
       staleBadgeImage('#ffffb2'),
@@ -332,16 +347,21 @@ describe('stationBadgeLayout', () => {
   })
 
   it('names an image for every class colour, even when a pollutant skips one', () => {
-    const [, , stale] = image({ min: 3, max: 90, ...base }, 'no2')
-
-    expect(JSON.stringify(stale)).toContain(staleBadgeImage('#bd0026'))
-    expect(JSON.stringify(stale)).not.toContain(staleBadgeImage('#f03b20'))
+    expect(JSON.stringify(icon('no2'))).toContain(staleBadgeImage('#bd0026'))
+    expect(JSON.stringify(icon('no2'))).not.toContain(staleBadgeImage('#f03b20'))
   })
 
-  it('falls back to the current pill, drawn white, where there are no classes', () => {
-    const [, , stale] = image({ min: 3, max: 90, ...base }, 'o3')
+  it('is absent where there are no classes, so the SDF layer draws stale readings', () => {
+    expect(staleBadgeLayer({ min: 3, max: 90, ...base }, 'o3')).toBeNull()
+  })
 
-    expect(stale).toBe('station-badge')
+  it('splits stale from fresh: MapLibre cannot mix SDF and non-SDF icons in one layer', () => {
+    const range = { min: 3, max: 90, ...base }
+
+    expect(JSON.stringify(stationBadgeFilter(range, 'pm25'))).toContain('"!"')
+    expect(JSON.stringify(staleBadgeLayer(range, 'pm25')?.filter)).toContain('stale')
+    expect(JSON.stringify(stationBadgeFilter(range, 'o3'))).not.toContain('"!"')
+    expect(STATION_BADGE_LAYOUT?.['icon-image']).toBe('station-badge')
   })
 })
 

@@ -250,30 +250,42 @@ export const STATION_BADGE_LAYOUT = {
 } as SymbolLayerSpecification['layout']
 
 /**
- * The icon of a stale reading is its class's hollow badge. A pollutant without a class table has
- * only a continuous ramp, which cannot be baked into an image, so there the current SDF pill is
- * drawn white with the ramp colour as its outline (see stationBadgePaint).
+ * With a class table, stale readings are drawn by their own layer (see staleBadgeLayer). MapLibre
+ * cannot mix SDF and non-SDF icons in one layer's buffer, so the SDF pill layer leaves them out.
+ * Without a table a stale reading stays here, drawn as the white SDF pill outlined in its ramp
+ * colour (see stationBadgePaint).
  */
-export function stationBadgeLayout(
+export function stationBadgeFilter(
   range: ValueRange | null,
   property: string | null = null,
-): SymbolLayerSpecification['layout'] {
+): ExpressionSpecification {
+  const classed = range !== null && guidelineClasses(property, range.unit) !== null
+  return classed ? ['all', HAS_VALUE_FILTER, ['!', STALE]] : HAS_VALUE_FILTER
+}
+
+/**
+ * The hollow badge of a stale reading: a full-colour image per class colour (badgeImage.ts), so it
+ * is a layer of its own. Null where the pollutant has no class table.
+ */
+export function staleBadgeLayer(range: ValueRange | null, property: string | null = null) {
   const classes = range === null ? null : guidelineClasses(property, range.unit)
   const last = classes?.at(-1)
-  const stale =
-    classes === null || last === undefined
-      ? BADGE_IMAGE
-      : [
-          'case',
-          ...classes
-            .slice(0, -1)
-            .flatMap((c) => [['<=', ['get', 'value'], c.upTo], staleBadgeImage(c.colour)]),
-          staleBadgeImage(last.colour),
-        ]
+  if (classes === null || last === undefined) return null
   return {
-    ...STATION_BADGE_LAYOUT,
-    'icon-image': ['case', STALE, stale, BADGE_IMAGE],
-  } as SymbolLayerSpecification['layout']
+    filter: ['all', HAS_VALUE_FILTER, STALE] as ExpressionSpecification,
+    layout: {
+      ...STATION_BADGE_LAYOUT,
+      'icon-image': [
+        'case',
+        ...classes
+          .slice(0, -1)
+          .flatMap((c) => [['<=', ['get', 'value'], c.upTo], staleBadgeImage(c.colour)]),
+        staleBadgeImage(last.colour),
+      ],
+    } as SymbolLayerSpecification['layout'],
+    // The badge is white inside, so its number is always dark.
+    paint: { 'text-color': INK } as SymbolLayerSpecification['paint'],
+  }
 }
 
 export function stationBadgePaint(
@@ -281,13 +293,13 @@ export function stationBadgePaint(
   property: string | null = null,
 ): SymbolLayerSpecification['paint'] {
   return {
-    // The border is the SDF halo of the same pill, so it is placed or dropped with it. A stale
-    // reading with a class table uses a baked image that ignores all three, so they only decide
-    // how a stale ramp reading looks: white inside, the ramp colour as the outline.
+    // The border is the SDF halo of the same pill, so it is placed or dropped with it. The stale
+    // cases only apply to a ramp reading (a classed one is in staleBadgeLayer): white inside, the
+    // ramp colour as the outline.
     'icon-color': ['case', STALE, '#ffffff', stationFill(range, property)],
     'icon-halo-color': ['case', STALE, stationFill(range, property), INK],
     'icon-halo-width': ['case', STALE, 3, 1.5],
-    // A hollow badge is white inside, so its number is always dark.
+    // A stale ramp reading is white inside, so its number is dark.
     'text-color': ['case', STALE, INK, badgeTextColour(range, property)],
   } as SymbolLayerSpecification['paint']
 }
@@ -310,13 +322,14 @@ export function stationDotPaint(
     'circle-color': ['case', STALE, '#ffffff', stationFill(range, property)],
     'circle-stroke-width': ['case', STALE, 3, 1.5],
     'circle-stroke-color': ['case', STALE, stationFill(range, property), INK],
-  } as CircleLayerSpecification['paint']
+  }
 }
 
 /** The ink edge of a stale dot: its class-coloured ring is too pale on the basemap to hold the dot. */
 export const STALE_DOT_FILTER: ExpressionSpecification = ['all', HAS_VALUE_FILTER, STALE]
 export const STATION_DOT_EDGE_PAINT = {
-  'circle-radius': 8.25,
+  // A stale dot's ring reaches 6 + 3 px, so the edge has to reach past it to show.
+  'circle-radius': 10,
   'circle-color': INK,
 } as CircleLayerSpecification['paint']
 

@@ -32,7 +32,7 @@ describe('staleBadgePixels', () => {
 
   it('has an ink edge outside a ring in the class colour, then white', () => {
     // Pixel 8 is the pill's edge (distance 0). Walking in: ink, the ring, then white.
-    expect(rgba(6, mid)).toEqual([0x12, 0x20, 0x1f, 255])
+    expect(rgba(7, mid)).toEqual([0x12, 0x20, 0x1f, 255])
     expect(rgba(9, mid)).toEqual([0xfd, 0x8d, 0x3c, 255])
     expect(rgba(13, mid)).toEqual([255, 255, 255, 255])
   })
@@ -42,9 +42,9 @@ describe('staleBadgePixels', () => {
   })
 
   it('has the same outline as the current badge and its halo', () => {
-    // A current badge draws its halo 1.5 px (3 image px) outside the edge at pixel 8, so pixel 5 is
-    // the outermost covered one; the hollow badge must not spill past it.
-    expect(rgba(4, mid)[3]).toBe(0)
-    expect(rgba(5, mid)[3]).toBeGreaterThan(100)
+    // A current badge draws its halo 1.5 texels outside the edge at pixel 8, so pixel 6 is the
+    // outermost covered one; the hollow badge must not spill past it.
+    expect(rgba(5, mid)[3]).toBe(0)
+    expect(rgba(6, mid)[3]).toBeGreaterThan(100)
   })
 })
