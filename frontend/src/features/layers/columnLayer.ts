@@ -63,16 +63,28 @@ export interface ColumnLayerInput {
   property: string | null
   view: MapView
   selectedId: string | null
+  /** False draws every column fully transparent; flipping it to true fades them in. */
+  grown: boolean
 }
+
+const FADE = { duration: 400 }
 
 /**
  * Height is the value, so it is always zero-based: a column twice as tall is a reading twice as
  * high. Size follows the map zoom, so the same view works for a street, a city or a country.
  */
-export function buildColumnLayers({ data, range, property, view, selectedId }: ColumnLayerInput) {
+export function buildColumnLayers({
+  data,
+  range,
+  property,
+  view,
+  selectedId,
+  grown,
+}: ColumnLayerInput) {
   const metres = metresPerPixel(view)
   const radius = metres * COLUMN_RADIUS_PX
   const heightScale = range && range.max > 0 ? (metres * COLUMN_MAX_HEIGHT_PX) / range.max : 0
+  const shown = (alpha: number) => (grown ? alpha : 0)
   const position = (s: Station) => s.geometry.coordinates
   const valued = data.features.filter((s) => s.properties.hasValue && s.properties.value !== null)
   const empty = data.features.filter((s) => !s.properties.hasValue)
@@ -85,7 +97,8 @@ export function buildColumnLayers({ data, range, property, view, selectedId }: C
       pickable: true,
       getPosition: position,
       getRadius: radius,
-      getFillColor: EMPTY_FILL,
+      getFillColor: [EMPTY_FILL[0], EMPTY_FILL[1], EMPTY_FILL[2], shown(EMPTY_FILL[3])],
+      transitions: { getFillColor: FADE },
       radiusMinPixels: 4,
     }),
     new ColumnLayer<Station>({
@@ -98,8 +111,10 @@ export function buildColumnLayers({ data, range, property, view, selectedId }: C
       // Lower than the station's own column, so the halo reads as a collar and the column keeps
       // its class colour instead of being painted over.
       getElevation: (s) => (s.properties.value ?? 0) * heightScale * 0.8,
-      getFillColor: SELECTED_FILL,
+      getFillColor: [SELECTED_FILL[0], SELECTED_FILL[1], SELECTED_FILL[2], shown(SELECTED_FILL[3])],
       material: false,
+      transitions: { getFillColor: FADE },
+      updateTriggers: { getElevation: [heightScale] },
     }),
     new ColumnLayer<Station>({
       id: 'columns',
@@ -114,9 +129,10 @@ export function buildColumnLayers({ data, range, property, view, selectedId }: C
         const rgbColour = range
           ? columnColour(s.properties.value ?? 0, range, property)
           : EMPTY_FILL
-        return [...rgbColour, s.properties.stale ? STALE_ALPHA : 255] as Rgba
+        return [...rgbColour, shown(s.properties.stale ? STALE_ALPHA : 255)] as Rgba
       },
-      updateTriggers: { getFillColor: [range, property], getElevation: [heightScale] },
+      transitions: { getFillColor: FADE },
+      updateTriggers: { getFillColor: [range, property, grown], getElevation: [heightScale] },
     }),
   ]
 }

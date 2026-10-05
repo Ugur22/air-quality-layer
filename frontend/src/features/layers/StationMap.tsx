@@ -285,6 +285,11 @@ export function StationMap({
   const mapRef = useRef<MapRef>(null)
   const overlayRef = useRef<MapboxOverlay>(null)
   const [columns, setColumns] = useState(false)
+  // Leaving the columns: they stay until the camera is flat again, see the button's handler.
+  const [leaving, setLeaving] = useState(false)
+  const leaveToken = useRef(0)
+  // Columns fade in once the camera has finished tilting, instead of showing up mid-move.
+  const [grown, setGrown] = useState(false)
   // Column size follows the zoom, in steps small enough to look continuous.
   const [view, setView] = useState<MapView>({ zoom: 8, latitude: 52 })
   const [pointer, setPointer] = useState(false)
@@ -337,8 +342,8 @@ export function StationMap({
     [layerBbox, showSyncedBox],
   )
   const columnLayers = useMemo(
-    () => (columns ? buildColumnLayers({ data, range, property, view, selectedId }) : []),
-    [columns, data, range, property, view, selectedId],
+    () => (columns ? buildColumnLayers({ data, range, property, view, selectedId, grown }) : []),
+    [columns, data, range, property, view, selectedId, grown],
   )
   /** The id of the station under a screen point: the style's layers, or deck.gl's columns. */
   const stationAt = (event: {
@@ -600,11 +605,11 @@ export function StationMap({
         <Button
           type="button"
           size="sm"
-          variant={columns ? 'default' : 'outline'}
+          variant={columns && !leaving ? 'default' : 'outline'}
           className="absolute right-3 top-24 z-10"
-          aria-pressed={columns}
+          aria-pressed={columns && !leaving}
           onClick={() => {
-            const pitch = columns ? 0 : COLUMN_PITCH
+            const pitch = columns && !leaving ? 0 : COLUMN_PITCH
             const map = mapRef.current
             // Tilting alone pushes the far end of a country off the screen, and fitBounds at a
             // pitch zooms out far more than needed. So: fit flat, then step back a little.
@@ -624,7 +629,30 @@ export function StationMap({
               map?.easeTo({ pitch, duration: 600 })
             }
             setHover(null)
-            setColumns((on) => !on)
+            if (pitch === 0 && map) {
+              // Badges mounted while the camera is still tilting are re-placed on every frame, so
+              // they flash in and out. They wait for the camera to settle.
+              setLeaving(true)
+              leaveToken.current += 1
+              const token = leaveToken.current
+              map.once('moveend', () => {
+                if (token !== leaveToken.current) return
+                setColumns(false)
+                setLeaving(false)
+              })
+            } else {
+              leaveToken.current += 1
+              setLeaving(false)
+              setColumns(true)
+              setGrown(false)
+              leaveToken.current += 1
+              const token = leaveToken.current
+              const reveal = () => {
+                if (token === leaveToken.current) setGrown(true)
+              }
+              if (map) map.once('moveend', reveal)
+              else reveal()
+            }
           }}
         >
           <Box className="size-4" aria-hidden />

@@ -13,13 +13,14 @@ const data: MapStationCollection = {
 }
 const range = { min: 7.6, max: 36.4, unit: 'µg/m³', otherUnitCount: 0 }
 
-function build(selectedId: string | null = null) {
+function build(selectedId: string | null = null, grown = true) {
   const layers = buildColumnLayers({
     data,
     range,
     property: 'pm25',
     view: { zoom: 11, latitude: 52.37 },
     selectedId,
+    grown,
   })
   const byId = (id: string) => layers.find((l) => l.id === id)
   return { byId }
@@ -58,6 +59,14 @@ describe('buildColumnLayers', () => {
 
     expect(column.getFillColor(feature('x', 7.6))).toEqual([255, 255, 178, 255])
     expect(column.getFillColor(feature('y', 36.4, true))).toEqual([253, 141, 60, 140])
+  })
+
+  it('draws every column transparent until it is told to fade in', () => {
+    const column = build(null, false).byId('columns')?.props as unknown as {
+      getFillColor: (s: ReturnType<typeof feature>) => number[]
+    }
+
+    expect(column.getFillColor(feature('x', 7.6))[3]).toBe(0)
   })
 
   it('adds a halo column only for the selected station', () => {
