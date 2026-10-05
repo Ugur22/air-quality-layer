@@ -1,4 +1,5 @@
 import { isStale } from '@/lib/freshness'
+import { median } from '@/lib/stats'
 import { readingOf } from '@/features/layers/stationReadings'
 import type { Bbox } from '@/features/regions/types'
 import type { MapLayerResponse, StationFeature } from '@/features/layers/types'
@@ -89,18 +90,14 @@ export function summarise(
     values.push(reading.value)
     unit ??= reading.unit
   }
-  values.sort((a, b) => a - b)
   const n = values.length
-  const lower = values[Math.floor((n - 1) / 2)]
-  const upper = values[Math.floor(n / 2)]
-  const median = lower === undefined || upper === undefined ? null : (lower + upper) / 2
   return {
     stations: stations.length,
     reporting: n,
     mean: n === 0 ? null : values.reduce((a, b) => a + b, 0) / n,
-    median,
-    min: values[0] ?? null,
-    max: values.at(-1) ?? null,
+    median: median(values),
+    min: n === 0 ? null : Math.min(...values),
+    max: n === 0 ? null : Math.max(...values),
     unit,
   }
 }

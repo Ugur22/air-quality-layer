@@ -119,13 +119,7 @@ export function ResultPanel({
     [layer],
   )
   const partCountries = useMemo(() => parts.flatMap((p) => p.country ?? []), [parts])
-  const filteredParts = useFilteredLayerParts(
-    parts.map((p) => ({
-      id: p.id,
-      country: layer?.map_layer.region_id === null ? p.country : null,
-    })),
-    filter,
-  )
+  const filteredParts = useFilteredLayerParts(parts, filter)
   const filteredError = filteredParts.find((q) => q.isError)?.error ?? null
 
   // The server rebuilds the national layer under a new id and always answers with the newest one,
