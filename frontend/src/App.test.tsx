@@ -911,7 +911,7 @@ describe('App', () => {
       expect(screen.queryByRole('form', { name: 'Region' })).not.toBeInTheDocument()
     })
 
-    it('offers the countries the server lists and asks for the chosen one', async () => {
+    it('offers the countries the server lists and asks for the added one', async () => {
       const { calls } = mockApi({
         ...routes,
         'GET /api/v1/national-layer': (call) =>
@@ -925,7 +925,7 @@ describe('App', () => {
       const user = userEvent.setup()
       renderApp()
       await user.click(await screen.findByRole('button', { name: 'Country' }))
-      const picker = await screen.findByRole('combobox', { name: 'Country' })
+      const picker = await screen.findByRole('combobox', { name: 'Countries' })
 
       await user.click(picker)
       await user.type(picker, 'turk')
@@ -935,19 +935,18 @@ describe('App', () => {
       await vi.waitFor(() => {
         expect(calls.some((c) => c.search.includes('country=TR'))).toBe(true)
       })
-      expect(await screen.findByRole('heading', { name: 'Turkey' })).toBeVisible()
-      // Turkey has no second source, so the rail does not claim one.
-      expect(screen.getByText(/OpenAQ stations across the country/i)).toBeVisible()
+      expect(await screen.findByRole('heading', { name: 'Netherlands and Turkey' })).toBeVisible()
     })
 
-    it('keeps the chosen country selected when the server lists none', async () => {
+    it('shows the chosen country even when the server lists none', async () => {
       mockApi({ ...routes, 'GET /api/v1/countries': () => jsonResponse(200, { countries: [] }) })
       const user = userEvent.setup()
       renderApp()
 
       await user.click(await screen.findByRole('button', { name: 'Country' }))
 
-      expect(await screen.findByRole('combobox', { name: 'Country' })).toHaveValue('NL')
+      const chosen = await screen.findByRole('group', { name: 'Chosen countries' })
+      expect(within(chosen).getByText('NL')).toBeVisible()
     })
 
     it('filters through the national endpoint of the chosen country, not a sync job', async () => {
@@ -985,6 +984,159 @@ describe('App', () => {
 
       expect(await screen.findByText(/has not been built yet/i)).toBeVisible()
       expect(screen.queryByText(/that was not found/i)).not.toBeInTheDocument()
+    })
+
+    describe('comparing two countries', () => {
+      const germany = {
+        map_layer: {
+          ...national.map_layer,
+          id: 'refresh-de',
+          country: 'DE',
+          station_count: 2,
+          bbox: [5.87, 47.27, 15.04, 55.06] as [number, number, number, number],
+        },
+        stations: {
+          type: 'FeatureCollection' as const,
+          features: ['g-1', 'g-2'].map((id, i) => ({
+            type: 'Feature' as const,
+            id,
+            geometry: { type: 'Point' as const, coordinates: [10 + i, 51] as [number, number] },
+            properties: {
+              name: `Station ${id}`,
+              readings: {
+                pm25: {
+                  value: i === 0 ? 12 : 20,
+                  unit: 'µg/m³',
+                  observed_at: '2026-10-03T08:00:00Z',
+                },
+              },
+            },
+          })),
+        },
+      }
+      const withGermany = {
+        countries: [
+          ...countries.countries,
+          { ...countries.countries[0], code: 'DE', name: 'Germany', bbox: germany.map_layer.bbox },
+        ],
+      }
+      const compareRoutes = {
+        ...routes,
+        'GET /api/v1/countries': () => jsonResponse(200, withGermany),
+        'GET /api/v1/national-layer': (call: Parameters<ReturnType<typeof layerServer>>[0]) =>
+          layerServer(call.search.includes('country=DE') ? germany : national)(call),
+      }
+
+      async function openWithGermany() {
+        const mock = mockApi(compareRoutes)
+        const user = userEvent.setup()
+        renderApp()
+        await user.click(await screen.findByRole('button', { name: 'Country' }))
+        const picker = await screen.findByRole('combobox', { name: 'Countries' })
+        await user.click(picker)
+        await user.click(await screen.findByRole('option', { name: /Germany/ }))
+        return { ...mock, user, picker }
+      }
+
+      it('puts both countries on one map and lists their stations together', async () => {
+        const { calls } = await openWithGermany()
+
+        await vi.waitFor(() => {
+          expect(screen.getByText('4 stations')).toBeVisible()
+        })
+        expect(calls.some((c) => c.search === '?country=NL')).toBe(true)
+        expect(calls.some((c) => c.search === '?country=DE')).toBe(true)
+      })
+
+      it('compares fresh readings of the chosen pollutant side by side', async () => {
+        await openWithGermany()
+
+        const table = await screen.findByRole('table')
+        // The Dutch stale reading (February) is left out; only 7.6 counts there.
+        const row = (name: string) =>
+          within(within(table).getByRole('row', { name: new RegExp(name) }))
+        await vi.waitFor(() => {
+          expect(
+            row('Average')
+              .getAllByRole('cell')
+              .map((c) => c.textContent),
+          ).toEqual(['7.6', '16'])
+        })
+        expect(
+          row('Reporting')
+            .getAllByRole('cell')
+            .map((c) => c.textContent),
+        ).toEqual(['1 of 2', '2 of 2'])
+        expect(
+          row('Highest')
+            .getAllByRole('cell')
+            .map((c) => c.textContent),
+        ).toEqual(['7.6', '20'])
+      })
+
+      it('shows the note for a country not built yet and still shows the other', async () => {
+        mockApi({
+          ...compareRoutes,
+          'GET /api/v1/national-layer': (call) =>
+            call.search.includes('country=DE')
+              ? apiError(404, 'not_found', 'National layer was not found.')
+              : layerServer(national)(call),
+        })
+        const user = userEvent.setup()
+        renderApp()
+        await user.click(await screen.findByRole('button', { name: 'Country' }))
+        const picker = await screen.findByRole('combobox', { name: 'Countries' })
+        await user.click(picker)
+        await user.click(await screen.findByRole('option', { name: /Germany/ }))
+
+        expect(await screen.findByText(/has not been built yet/i)).toBeVisible()
+        expect(screen.getByText('2 stations')).toBeVisible()
+        expect(screen.queryByRole('table')).not.toBeInTheDocument()
+        expect(screen.queryByText(/that was not found/i)).not.toBeInTheDocument()
+      })
+
+      it('allows no more than two countries', async () => {
+        const { user, picker } = await openWithGermany()
+
+        await user.click(picker)
+
+        expect(await screen.findByRole('option', { name: /Turkey/ })).toHaveAttribute(
+          'aria-disabled',
+          'true',
+        )
+        expect(screen.getByText(/remove one to compare/i)).toBeVisible()
+      })
+
+      it('goes back to one country, and never to none', async () => {
+        const { user } = await openWithGermany()
+        await screen.findByRole('table')
+
+        await user.click(screen.getByRole('button', { name: 'Remove Germany' }))
+
+        await vi.waitFor(() => {
+          expect(screen.queryByRole('table')).not.toBeInTheDocument()
+        })
+        expect(screen.getByRole('button', { name: 'Remove Netherlands' })).toBeDisabled()
+      })
+
+      it('filters each country through its own national layer', async () => {
+        const { calls, user } = await openWithGermany()
+        await screen.findByRole('table')
+
+        await user.type(await screen.findByLabelText(/value/i), '15')
+
+        await vi.waitFor(() => {
+          const filtered = calls.filter((c) => c.search.includes('value=15'))
+          expect(filtered.map((c) => new URLSearchParams(c.search).get('country')).sort()).toEqual([
+            'DE',
+            'NL',
+          ])
+        })
+        // Above 15: Germany's 20, and the Dutch stale 36.4 (the server filters by value, not age).
+        await vi.waitFor(() => {
+          expect(screen.getByText(/showing 2 of 4 stations/i)).toBeVisible()
+        })
+      })
     })
 
     it('goes back to the region form', async () => {

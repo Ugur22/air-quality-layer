@@ -1,4 +1,5 @@
-import { keepPreviousData, useQuery } from '@tanstack/react-query'
+import { keepPreviousData, useQueries, useQuery, type UseQueryResult } from '@tanstack/react-query'
+import { mergeLayers } from '@/features/national/compare'
 import { apiFetch } from '@/lib/api'
 import type { LayerFilter } from './filter'
 import type { MapLayerResponse, StationHistoryResponse } from './types'
@@ -35,35 +36,56 @@ export function useMapLayer(mapLayerId: string | null) {
 
 const NATIONAL_REFETCH_MS = 10 * 60 * 1000
 
+function combineNational(results: UseQueryResult<MapLayerResponse>[]) {
+  return {
+    /** The layers that have loaded, as one; its parts keep the order the countries were asked in. */
+    layer: mergeLayers(results.flatMap((r) => (r.data ? [r.data] : []))),
+    /** Per country, in the order asked: its own layer, or null while it has none. */
+    layers: results.map((r) => r.data ?? null),
+    errors: results.map((r) => r.error),
+    loading: results.some((r) => r.isLoading),
+    updatedAt: Math.max(0, ...results.map((r) => r.dataUpdatedAt)),
+  }
+}
+
 /**
- * A whole-country layer. The server rebuilds it hourly, so it is asked again now and then for
- * as long as the view is open rather than only once.
+ * Whole-country layers, one per code. The server rebuilds each hourly, so they are asked again now
+ * and then for as long as the view is open rather than only once.
  */
-export function useNationalLayer(country: string, enabled: boolean) {
+export function useNationalLayers(countries: string[], enabled: boolean) {
+  return useQueries({
+    queries: countries.map((country) => ({
+      queryKey: ['national-layer', country],
+      queryFn: () => getMapLayer('', null, country),
+      enabled,
+      refetchInterval: NATIONAL_REFETCH_MS,
+    })),
+    combine: combineNational,
+  })
+}
+
+type FilterPart = { id: string; country: string | null } | undefined
+
+function useFilteredLayerSlot(part: FilterPart, filter: LayerFilter | null) {
   return useQuery({
-    queryKey: ['national-layer', country],
-    queryFn: () => getMapLayer('', null, country),
-    enabled,
-    refetchInterval: NATIONAL_REFETCH_MS,
+    queryKey: ['map-layer', part?.id ?? null, filter],
+    queryFn: () => getMapLayer(part?.id ?? '', filter, part?.country ?? null),
+    enabled: part !== undefined && filter !== null,
+    // The previous answer stays on screen while a new one loads.
+    placeholderData: keepPreviousData,
   })
 }
 
 /**
- * The stations matching a filter. The server does the matching (the contract's filter), and each
- * feature keeps the id it has in the unfiltered layer, so the result is used as a set of ids.
- * The previous answer stays on screen while a new one loads.
+ * The stations matching a filter in each of up to two layers (a country each, or one region layer;
+ * `country: null` is a region layer). Two fixed slots rather than `useQueries`, because only a
+ * single observer keeps its previous answer when the filter changes. Answers are per part, so the
+ * caller checks each against the layer it is shown for.
  */
-export function useFilteredMapLayer(
-  mapLayerId: string | null,
-  filter: LayerFilter | null,
-  country: string | null = null,
-) {
-  return useQuery({
-    queryKey: ['map-layer', mapLayerId, filter],
-    queryFn: () => getMapLayer(mapLayerId ?? '', filter, country),
-    enabled: mapLayerId !== null && filter !== null,
-    placeholderData: keepPreviousData,
-  })
+export function useFilteredLayerParts(parts: FilterPart[], filter: LayerFilter | null) {
+  const first = useFilteredLayerSlot(parts[0], filter)
+  const second = useFilteredLayerSlot(parts[1], filter)
+  return [first, second].slice(0, Math.max(1, parts.length))
 }
 
 export const HISTORY_HOURS = 24

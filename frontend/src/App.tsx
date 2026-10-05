@@ -2,8 +2,9 @@ import { useMemo } from 'react'
 import { RegionForm } from '@/features/regions/RegionForm'
 import { useProjects } from '@/features/projects/api'
 import { ResultPanel } from '@/features/layers/ResultPanel'
-import { useMapLayer, useNationalLayer } from '@/features/layers/api'
+import { useMapLayer, useNationalLayers } from '@/features/layers/api'
 import { useCountries } from '@/features/national/api'
+import { unionBbox } from '@/features/national/compare'
 import { CountryPicker, NationalNotes, ViewSwitch } from '@/features/national/NationalView'
 import { ApiError } from '@/lib/api'
 import { isInFlight, useSyncJob } from '@/features/syncs/api'
@@ -21,18 +22,27 @@ export default function App() {
   const national = useSession((s) => s.nationalView)
   const setNational = useSession((s) => s.setNationalView)
   const regionLayer = useMapLayer(job?.status === 'succeeded' ? job.map_layer_id : null)
-  const country = useSession((s) => s.country)
-  const setCountry = useSession((s) => s.setCountry)
+  const codes = useSession((s) => s.countries)
+  const toggleCountry = useSession((s) => s.toggleCountry)
   const countries = useCountries(national)
-  const chosenCountry = countries.data?.find((c) => c.code === country)
-  const countryName = chosenCountry?.name ?? country
-  const nationalLayer = useNationalLayer(country, national)
-  const layer = national ? nationalLayer : regionLayer
-  const notBuiltYet =
-    national && nationalLayer.error instanceof ApiError && nationalLayer.error.status === 404
+  const frame = unionBbox(
+    codes.flatMap((code) => {
+      const bbox = countries.data?.find((c) => c.code === code)?.bbox
+      return bbox ? [bbox] : []
+    }),
+  )
+  const nameOf = (code: string) => countries.data?.find((c) => c.code === code)?.name ?? code
+  const countryName = codes.map(nameOf).join(' and ')
+  const nationalLayers = useNationalLayers(codes, national)
+  const shown = national ? nationalLayers.layer : (regionLayer.data ?? null)
+  const loading = national ? nationalLayers.loading : regionLayer.isLoading
+  // A country whose layer has not been built yet is told in the rail, not shown as an error.
+  const notBuilt = nationalLayers.errors.map((e) => e instanceof ApiError && e.status === 404)
+  const nationalFailure = nationalLayers.errors.find((e, i) => e !== null && !notBuilt[i]) ?? null
+  const loadError = national ? nationalFailure : regionLayer.isError ? regionLayer.error : null
 
   // Ages are measured from when the stations were fetched, so every part of the page agrees.
-  const fetchedAt = layer.dataUpdatedAt
+  const fetchedAt = national ? nationalLayers.updatedAt : regionLayer.dataUpdatedAt
   const now = useMemo(() => new Date(fetchedAt), [fetchedAt])
 
   const project = projects.data?.[0]
@@ -44,14 +54,17 @@ export default function App() {
   const nationalSection = (
     <div className="flex flex-col gap-5">
       {switcher}
-      <CountryPicker countries={countries.data} code={country} onChange={setCountry} />
-      <NationalNotes
-        country={{ code: country, name: countryName }}
-        layer={nationalLayer.data ?? null}
-        loading={nationalLayer.isLoading}
-        notBuiltYet={notBuiltYet}
-        now={now}
-      />
+      <CountryPicker countries={countries.data} codes={codes} onToggle={toggleCountry} />
+      {codes.map((code, i) => (
+        <NationalNotes
+          key={code}
+          country={{ code, name: nameOf(code) }}
+          layer={nationalLayers.layers[i] ?? null}
+          loading={nationalLayers.layers[i] === null && nationalLayers.errors[i] === null}
+          notBuiltYet={notBuilt[i] ?? false}
+          now={now}
+        />
+      ))}
     </div>
   )
 
@@ -108,12 +121,12 @@ export default function App() {
         <ResultPanel
           rail={national ? nationalSection : regionSection}
           title={national ? countryName : region ? region.name : 'Stations'}
-          loading={layer.isLoading}
-          error={layer.isError && !notBuiltYet ? describeError(layer.error) : null}
-          layer={layer.data ?? null}
-          countryView={national && chosenCountry ? chosenCountry : null}
+          loading={loading}
+          error={loadError ? describeError(loadError) : null}
+          layer={shown}
+          countryView={national && frame ? { codes, bbox: frame } : null}
           now={now}
-          idle={!national && !busy && !layer.isLoading && !layer.isError}
+          idle={!national && !busy && !loading && loadError === null}
         />
       </main>
     </div>

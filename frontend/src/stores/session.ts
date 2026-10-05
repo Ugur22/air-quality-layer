@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Comparator } from '@/features/layers/filter'
 import type { Bbox, Region } from '@/features/regions/types'
+import { MAX_COUNTRIES } from '@/features/national/compare'
 import { DEFAULT_COUNTRY } from '@/features/national/types'
 import { EMPTY_DRAFT, type RegionFormValues } from '@/features/regions/validation'
 
@@ -13,9 +14,10 @@ interface SessionState {
   /** Show the whole-country layer instead of the region being worked on (ADR 0018). */
   nationalView: boolean
   setNationalView: (on: boolean) => void
-  /** Which country the whole-country view shows, by ISO code (ADR 0019). */
-  country: string
-  setCountry: (code: string) => void
+  /** Which countries the whole-country view shows, by ISO code (ADR 0019); two are compared. */
+  countries: string[]
+  /** Adds the country, or removes it when already chosen; the last one cannot be removed. */
+  toggleCountry: (code: string) => void
   syncJobId: string | null
   /** The pollutant the map colours by; null means "the layer's default". */
   colourProperty: string | null
@@ -56,9 +58,19 @@ export const useSession = create<SessionState>((set) => ({
     // A selection or a pollutant filter from the other layer means nothing on this one.
     set({ nationalView, selectedStationId: null, filterValue: '', colourProperty: null })
   },
-  country: DEFAULT_COUNTRY,
-  setCountry: (country) => {
-    set({ country, selectedStationId: null, filterValue: '', colourProperty: null })
+  countries: [DEFAULT_COUNTRY],
+  toggleCountry: (code) => {
+    set((state) => {
+      const chosen = state.countries.includes(code)
+      if (chosen && state.countries.length === 1) return state
+      if (!chosen && state.countries.length >= MAX_COUNTRIES) return state
+      return {
+        countries: chosen ? state.countries.filter((c) => c !== code) : [...state.countries, code],
+        selectedStationId: null,
+        filterValue: '',
+        colourProperty: null,
+      }
+    })
   },
   syncJobId: null,
   colourProperty: null,
@@ -113,7 +125,7 @@ export const useSession = create<SessionState>((set) => ({
     set({
       region: null,
       nationalView: false,
-      country: DEFAULT_COUNTRY,
+      countries: [DEFAULT_COUNTRY],
       syncJobId: null,
       colourProperty: null,
       selectedStationId: null,

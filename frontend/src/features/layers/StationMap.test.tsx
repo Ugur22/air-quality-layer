@@ -703,7 +703,7 @@ describe('StationMap', () => {
         selectedId={null}
         onSelect={vi.fn()}
         now={now}
-        countryView={{ code: 'TR', bbox: turkey }}
+        countryView={{ codes: ['TR'], bbox: turkey }}
       />,
     )
 

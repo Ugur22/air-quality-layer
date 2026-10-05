@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { amsterdamDraft } from '@/test/fixtures'
 import { useSession } from './session'
 
@@ -54,5 +54,41 @@ describe('session store: place search support', () => {
     useSession.getState().reset()
 
     expect(useSession.getState().draft.name).toBe('Keep me')
+  })
+})
+
+describe('session store: comparing countries', () => {
+  beforeEach(() => {
+    useSession.setState({ countries: ['NL'] })
+  })
+
+  it('adds a second country and removes one again', () => {
+    useSession.getState().toggleCountry('DE')
+    expect(useSession.getState().countries).toEqual(['NL', 'DE'])
+
+    useSession.getState().toggleCountry('NL')
+    expect(useSession.getState().countries).toEqual(['DE'])
+  })
+
+  it('refuses a third country and removing the last one', () => {
+    useSession.getState().toggleCountry('DE')
+    useSession.getState().toggleCountry('FR')
+    expect(useSession.getState().countries).toEqual(['NL', 'DE'])
+
+    useSession.getState().toggleCountry('DE')
+    useSession.getState().toggleCountry('NL')
+    expect(useSession.getState().countries).toEqual(['NL'])
+  })
+
+  it('drops a selection and filter that belonged to the earlier countries', () => {
+    useSession.setState({ selectedStationId: 's', filterValue: '5', colourProperty: 'no2' })
+
+    useSession.getState().toggleCountry('DE')
+
+    expect(useSession.getState()).toMatchObject({
+      selectedStationId: null,
+      filterValue: '',
+      colourProperty: null,
+    })
   })
 })

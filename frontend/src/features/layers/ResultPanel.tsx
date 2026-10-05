@@ -2,13 +2,14 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useCallback, useEffect, useMemo, type ReactNode } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
+import { CompareSummary } from '@/features/national/CompareSummary'
 import { DEFAULT_COUNTRY } from '@/features/national/types'
 import type { Bbox } from '@/features/regions/types'
 import { boxProblem, draftBbox, DRAWN_AREA_NAME, isBoxEmpty } from '@/features/regions/validation'
 import { describeError } from '@/features/syncs/messages'
 import { useDebouncedValue } from '@/lib/useDebouncedValue'
 import { useSession } from '@/stores/session'
-import { useFilteredMapLayer } from './api'
+import { useFilteredLayerParts } from './api'
 import { parseFilterValue, type LayerFilter } from './filter'
 import { FILTER_DEBOUNCE_MS } from './filterTiming'
 import { pollutantLabel } from './pollutants'
@@ -38,7 +39,7 @@ export function ResultPanel({
   error?: string | null
   layer: MapLayerResponse | null
   /** The country being looked at in the country view, for framing it before its layer arrives. */
-  countryView?: { code: string; bbox: Bbox } | null
+  countryView?: { codes: string[]; bbox: Bbox } | null
   /** When the layer was fetched: one clock for the map, the popup and the list. */
   now: Date
   /** Nothing is running or loading, so telling the user what to do next makes sense. */
@@ -100,36 +101,73 @@ export function ResultPanel({
     [hasLayer, property, comparator, settledValue],
   )
   const queryClient = useQueryClient()
-  const filtered = useFilteredMapLayer(
-    layer?.map_layer.id ?? null,
-    filter,
-    layer?.map_layer.region_id === null ? (layer.map_layer.country ?? DEFAULT_COUNTRY) : null,
+  // A national layer may be several countries' layers merged; each is filtered by the server on
+  // its own and the answers are put together here.
+  const parts = useMemo(
+    () =>
+      layer === null
+        ? []
+        : (layer.map_layer.parts ?? [
+            {
+              id: layer.map_layer.id,
+              country:
+                layer.map_layer.region_id === null
+                  ? (layer.map_layer.country ?? DEFAULT_COUNTRY)
+                  : null,
+            },
+          ]),
+    [layer],
   )
+  const partCountries = useMemo(() => parts.flatMap((p) => p.country ?? []), [parts])
+  const filteredParts = useFilteredLayerParts(
+    parts.map((p) => ({
+      id: p.id,
+      country: layer?.map_layer.region_id === null ? p.country : null,
+    })),
+    filter,
+  )
+  const filteredError = filteredParts.find((q) => q.isError)?.error ?? null
 
   // The server rebuilds the national layer under a new id and always answers with the newest one,
   // so a filtered answer for another id means the layer on screen is out of date: reload it.
-  const answeredFor = filter ? filtered.data?.map_layer.id : undefined
-  const shownId = layer?.map_layer.id
   const isNational = layer?.map_layer.region_id === null
+  const outOfDate =
+    filter !== null &&
+    parts.some((p, i) => {
+      const answeredFor = filteredParts[i]?.data?.map_layer.id
+      return answeredFor !== undefined && answeredFor !== p.id
+    })
   useEffect(() => {
-    if (isNational && answeredFor !== undefined && answeredFor !== shownId) {
+    if (isNational && outOfDate) {
       void queryClient.invalidateQueries({ queryKey: ['national-layer'] })
     }
-  }, [isNational, answeredFor, shownId, queryClient])
+  }, [isNational, outOfDate, queryClient])
 
-  // Only an answer for this very layer may decide what is shown (the previous answer is kept on
+  // Only answers for these very layers may decide what is shown (the previous answer is kept on
   // screen while a new one loads, and after a new sync it could belong to the old layer).
-  const answer =
-    filter && filtered.data?.map_layer.id === layer?.map_layer.id ? filtered.data : undefined
+  const answers = parts.map((p, i) => {
+    const data = filteredParts[i]?.data
+    return filter && data?.map_layer.id === p.id ? data : undefined
+  })
+  const answered = filter !== null && parts.length > 0 && answers.every((a) => a !== undefined)
   // What is typed or chosen is ahead of what is shown, or the shown answer is a kept-over one.
   const updating =
     (parsed.kind === 'ok' && parsed.value !== settledValue) ||
-    (filter !== null && (filtered.isPlaceholderData || (filtered.isFetching && !answer)))
+    (filter !== null &&
+      (filteredParts.some((q) => q.isPlaceholderData) ||
+        (filteredParts.some((q) => q.isFetching) && !answered)))
 
   const allStations = useMemo(() => layer?.stations.features ?? [], [layer])
+  // At most two parts exist (MAX_COUNTRIES), so the dependencies have a fixed size.
+  const [firstAnswer, secondAnswer] = answers
   const visibleIds = useMemo(
-    () => (answer ? new Set(answer.stations.features.map((f) => f.id)) : null),
-    [answer],
+    () =>
+      answered
+        ? new Set(
+            [firstAnswer, secondAnswer].flatMap((a) => a?.stations.features.map((f) => f.id) ?? []),
+          )
+        : null,
+    [answered, firstAnswer, secondAnswer],
   )
   const stations = useMemo(
     () => (visibleIds ? allStations.filter((s) => visibleIds.has(s.id)) : allStations),
@@ -240,7 +278,7 @@ export function ResultPanel({
             <LayerFilterControls property={property} parsed={settled} />
             {/* One status element stays mounted so screen readers announce its changes. */}
             <p role="status" className="text-sm">
-              {filtered.isError
+              {filteredError !== null
                 ? null
                 : updating
                   ? 'Updating…'
@@ -250,12 +288,20 @@ export function ResultPanel({
                       : `Showing ${String(stations.length)} of ${String(allStations.length)} stations.`
                     : null}
             </p>
-            {filtered.isError ? (
+            {filteredError !== null ? (
               <Alert variant="destructive">
-                <AlertDescription>{describeError(filtered.error)}</AlertDescription>
+                <AlertDescription>{describeError(filteredError)}</AlertDescription>
               </Alert>
             ) : null}
           </section>
+        ) : null}
+        {parts.length === 2 && property !== null ? (
+          <CompareSummary
+            stations={stations}
+            countries={partCountries}
+            property={property}
+            now={now}
+          />
         ) : null}
       </section>
       {selectedStation && layer ? (
@@ -263,7 +309,10 @@ export function ResultPanel({
           key={selectedStation.id}
           station={selectedStation}
           stations={allStations}
-          layerId={layer.map_layer.id}
+          layerId={
+            parts.find((p) => p.country === selectedStation.properties.country)?.id ??
+            layer.map_layer.id
+          }
           property={property}
           now={now}
           onClose={() => {

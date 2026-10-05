@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { BASEMAP_STYLE_URL } from '@/lib/config'
 import { formatValue } from '@/lib/format'
 import { useCountryBorder } from '@/features/national/borders'
+import { COUNTRY_COLOURS } from '@/features/national/compare'
 import { DEFAULT_COUNTRY } from '@/features/national/types'
 import {
   buildMapData,
@@ -77,10 +78,13 @@ function Legend({
   property,
   range,
   showSyncedBox,
+  countries,
 }: {
   property: string | null
   range: ReturnType<typeof valueRange>
   showSyncedBox: boolean
+  /** Only when two countries are compared: each one's border colour. */
+  countries: { code: string; colour: string }[]
 }) {
   const [guideOpen, setGuideOpen] = useState(false)
   const classes = range === null ? null : guidelineClasses(property, range.unit)
@@ -211,6 +215,19 @@ function Legend({
             until you zoom in.
           </span>
         </li>
+        {countries.map((c) => (
+          <li key={c.code}>
+            <span aria-hidden className="mt-1 grid place-items-center">
+              <span
+                className="h-2.5 w-4.5 rounded-xs border-[1.5px]"
+                style={{ borderColor: c.colour }}
+              />
+            </span>
+            <span>
+              <b>{c.code} border</b> the country outline.
+            </span>
+          </li>
+        ))}
         {showSyncedBox ? (
           <>
             <li>
@@ -277,10 +294,10 @@ export function StationMap({
   /** Moves the camera to a box (a chosen place); a request with a new id moves it again. */
   viewRequest?: { bbox: Bbox; id: number } | null
   /**
-   * The country the country view is on. Until its layer exists (loading, or not built yet) the map
+   * The countries the country view is on (two when comparing). Until its layer exists (loading, or not built yet) the map
    * shows that country's border and frames it, instead of the previous place with nothing in it.
    */
-  countryView?: { code: string; bbox: Bbox } | null
+  countryView?: { codes: string[]; bbox: Bbox } | null
 }) {
   const mapRef = useRef<MapRef>(null)
   const overlayRef = useRef<MapboxOverlay>(null)
@@ -333,12 +350,19 @@ export function StationMap({
   const isNational = layer?.map_layer.region_id === null
   // The country's real border frames the stations; the stations themselves are still whatever the
   // sources returned, so none is dropped for lying just outside a simplified line.
-  const shownCountry = layer
+  const shownCountries = layer
     ? isNational
-      ? (layer.map_layer.country ?? DEFAULT_COUNTRY)
-      : null
-    : (countryView?.code ?? null)
-  const border = useCountryBorder(shownCountry)
+      ? (layer.map_layer.parts?.map((p) => p.country) ?? [
+          layer.map_layer.country ?? DEFAULT_COUNTRY,
+        ])
+      : []
+    : (countryView?.codes ?? [])
+  // A country keeps its colour even while the other one's layer has not arrived.
+  const slotOf = (code: string) => Math.max(0, (countryView?.codes ?? shownCountries).indexOf(code))
+  const borders = [
+    useCountryBorder(shownCountries[0] ?? null),
+    useCountryBorder(shownCountries[1] ?? null),
+  ]
   const showSyncedBox = layerBbox !== null && !isNational && !sameBox(layerBbox, draftBbox)
   const syncedRegion = useMemo(
     () => (layerBbox && showSyncedBox ? outline(layerBbox) : EMPTY),
@@ -374,13 +398,13 @@ export function StationMap({
 
   // A country whose layer is not there yet is framed by the country's own box.
   const waitingFor = layer === null ? countryView : null
-  const waitingCode = waitingFor?.code
+  const waitingCodes = waitingFor?.codes.join()
   const waitingBbox = waitingFor?.bbox
   useEffect(() => {
     const map = mapRef.current
     if (!map || !waitingBbox) return
     map.fitBounds(waitingBbox, { padding: FIT_PADDING_BOX, ...FLY_OVER })
-  }, [waitingCode, waitingBbox])
+  }, [waitingCodes, waitingBbox])
 
   // A chosen place moves the camera once; a request that was already there when the map appeared
   // (a remount) does not move it again.
@@ -527,18 +551,28 @@ export function StationMap({
           </Source>
           {/* Always mounted, like the region box: a source added later would be drawn over the
               stations. */}
-          <Source id="country" type="geojson" data={border ?? EMPTY}>
-            <Layer
-              id="country-fill"
-              type="fill"
-              paint={{ 'fill-color': '#0a7570', 'fill-opacity': 0.06 }}
-            />
-            <Layer
-              id="country-outline"
-              type="line"
-              paint={{ 'line-color': '#0a7570', 'line-width': 2 }}
-            />
-          </Source>
+          {borders.map((border, i) => {
+            const colour = COUNTRY_COLOURS[slotOf(shownCountries[i] ?? '')] ?? COUNTRY_COLOURS[0]
+            return (
+              <Source
+                key={i}
+                id={i === 0 ? 'country' : `country-${String(i)}`}
+                type="geojson"
+                data={border ?? EMPTY}
+              >
+                <Layer
+                  id={i === 0 ? 'country-fill' : `country-${String(i)}-fill`}
+                  type="fill"
+                  paint={{ 'fill-color': colour, 'fill-opacity': 0.06 }}
+                />
+                <Layer
+                  id={i === 0 ? 'country-outline' : `country-${String(i)}-outline`}
+                  type="line"
+                  paint={{ 'line-color': colour, 'line-width': 2 }}
+                />
+              </Source>
+            )
+          })}
           {showSyncedBox ? (
             <Source id="synced" type="geojson" data={syncedRegion}>
               <Layer
@@ -675,7 +709,21 @@ export function StationMap({
           flipY={hover.flipY}
         />
       ) : null}
-      {layer ? <Legend property={property} range={range} showSyncedBox={showSyncedBox} /> : null}
+      {layer ? (
+        <Legend
+          property={property}
+          range={range}
+          showSyncedBox={showSyncedBox}
+          countries={
+            shownCountries.length > 1
+              ? shownCountries.map((code) => ({
+                  code,
+                  colour: COUNTRY_COLOURS[slotOf(code)] ?? COUNTRY_COLOURS[0],
+                }))
+              : []
+          }
+        />
+      ) : null}
     </div>
   )
 }

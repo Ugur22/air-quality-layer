@@ -10,7 +10,13 @@ export interface StationFeature {
   type: 'Feature'
   id: string
   geometry: { type: 'Point'; coordinates: [number, number] }
-  properties: { name: string; sources?: string[]; readings: Record<string, Reading> }
+  properties: {
+    name: string
+    sources?: string[]
+    readings: Record<string, Reading>
+    /** Client-only: set when several countries' layers are merged, never sent by the API. */
+    country?: string
+  }
 }
 
 export interface MapLayerResponse {
@@ -25,6 +31,8 @@ export interface MapLayerResponse {
     station_count: number
     bbox: [number, number, number, number]
     property_keys: string[]
+    /** Client-only: the country layers a merged layer is made of, never sent by the API. */
+    parts?: { country: string; id: string }[]
   }
   stations: { type: 'FeatureCollection'; features: StationFeature[] }
 }

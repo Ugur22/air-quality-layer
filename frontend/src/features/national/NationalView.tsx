@@ -1,10 +1,12 @@
 import { Command } from 'cmdk'
+import { X } from 'lucide-react'
 import { useState } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { formatAge } from '@/lib/freshness'
 import { cn } from '@/lib/utils'
 import type { MapLayerResponse } from '@/features/layers/types'
+import { COUNTRY_COLOURS, MAX_COUNTRIES } from './compare'
 import type { Country } from './types'
 
 const OPTIONS = [
@@ -41,32 +43,65 @@ export function ViewSwitch({
   )
 }
 
-/** Chooses which country the map shows. The server's list is the only source of countries. */
+/**
+ * Chooses which countries the map shows: one, or two to compare. The server's list is the only
+ * source of countries.
+ */
 export function CountryPicker({
   countries,
-  code,
-  onChange,
+  codes,
+  onToggle,
 }: {
   countries: Country[] | undefined
-  code: string
-  onChange: (code: string) => void
+  codes: string[]
+  onToggle: (code: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
-  // The chosen code is always an option, so the box never looks empty or shows another country
-  // while the list is loading, empty, or does not contain it.
+  // A chosen code is always an option, so a chip never shows blank while the list is loading,
+  // empty, or does not contain it.
   const listed = countries ?? []
-  const options = listed.some((country) => country.code === code)
-    ? listed
-    : [{ code, name: code }, ...listed]
-  const chosen = options.find((country) => country.code === code)?.name ?? code
+  const options = [
+    ...codes
+      .filter((code) => !listed.some((c) => c.code === code))
+      .map((code) => ({ code, name: code })),
+    ...listed,
+  ]
+  const nameOf = (code: string) => options.find((c) => c.code === code)?.name ?? code
+  const full = codes.length >= MAX_COUNTRIES
   return (
     <div className="flex flex-col gap-1.5">
       <span aria-hidden className="text-sm font-medium leading-none text-ink">
-        Country
+        Countries
       </span>
+      <div role="group" aria-label="Chosen countries" className="flex flex-wrap gap-1.5">
+        {codes.map((code, i) => (
+          <span
+            key={code}
+            className="flex items-center gap-1.5 rounded-full border border-line bg-paper py-1 pl-2.5 pr-1 text-sm"
+          >
+            <span
+              aria-hidden
+              className="size-2.5 rounded-full"
+              style={{ backgroundColor: COUNTRY_COLOURS[i] }}
+            />
+            {nameOf(code)}
+            <button
+              type="button"
+              disabled={codes.length === 1}
+              aria-label={`Remove ${nameOf(code)}`}
+              onClick={() => {
+                onToggle(code)
+              }}
+              className="grid size-5 place-items-center rounded-full text-muted hover:bg-accent-soft disabled:opacity-40 disabled:hover:bg-transparent focus-visible:outline-2 focus-visible:outline-accent"
+            >
+              <X className="size-3" aria-hidden />
+            </button>
+          </span>
+        ))}
+      </div>
       <Command
-        label="Country"
+        label="Countries"
         className="relative"
         onKeyDown={(event) => {
           if (event.key === 'Escape') setOpen(false)
@@ -77,45 +112,55 @@ export function CountryPicker({
         }}
       >
         <Command.Input
-          // Closed, the box names the country shown; open, it is the search text.
-          value={open ? search : chosen}
-          placeholder={open ? chosen : undefined}
+          value={search}
+          placeholder={full ? 'Two countries chosen' : 'Add a country to compare'}
           onValueChange={(value) => {
             setSearch(value)
             setOpen(true)
           }}
           onFocus={() => {
-            setSearch('')
             setOpen(true)
           }}
           onClick={() => {
             setOpen(true)
           }}
-          className="flex h-10 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
+          className="flex h-10 w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink placeholder:text-muted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-accent"
         />
         {open ? (
           <Command.List className="absolute z-20 mt-1 max-h-72 w-full overflow-auto rounded-md border border-line bg-surface p-1 shadow-md">
             <Command.Empty className="px-3 py-2 text-sm text-muted">
               No country found.
             </Command.Empty>
-            {options.map((country) => (
-              <Command.Item
-                key={country.code}
-                value={country.name}
-                keywords={[country.code]}
-                onSelect={() => {
-                  onChange(country.code)
-                  setOpen(false)
-                }}
-                className="flex cursor-pointer items-baseline justify-between gap-3 rounded px-3 py-2 text-sm aria-selected:bg-accent-soft"
-              >
-                <span className={cn(country.code === code && 'font-semibold')}>{country.name}</span>
-                <span className="font-mono text-xs text-muted">{country.code}</span>
-              </Command.Item>
-            ))}
+            {options.map((country) => {
+              const chosen = codes.includes(country.code)
+              // The last country cannot be removed here either, or the view would be empty.
+              const blocked = chosen ? codes.length === 1 : full
+              return (
+                <Command.Item
+                  key={country.code}
+                  value={country.name}
+                  keywords={[country.code]}
+                  disabled={blocked}
+                  onSelect={() => {
+                    onToggle(country.code)
+                    setSearch('')
+                  }}
+                  className="flex cursor-pointer items-baseline justify-between gap-3 rounded px-3 py-2 text-sm aria-disabled:cursor-not-allowed aria-disabled:opacity-50 aria-selected:bg-accent-soft"
+                >
+                  <span className={cn(chosen && 'font-semibold')}>
+                    {chosen ? '✓ ' : null}
+                    {country.name}
+                  </span>
+                  <span className="font-mono text-xs text-muted">{country.code}</span>
+                </Command.Item>
+              )
+            })}
           </Command.List>
         ) : null}
       </Command>
+      {full ? (
+        <p className="text-xs text-muted">Remove one to compare a different country.</p>
+      ) : null}
     </div>
   )
 }
