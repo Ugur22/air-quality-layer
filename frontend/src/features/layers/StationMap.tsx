@@ -48,7 +48,7 @@ const FLY_OVER = { speed: 1.1, maxDuration: 3500 }
 const NETHERLANDS_BOUNDS: Bbox = [3.3, 50.75, 7.25, 53.55]
 // How far a tilted country view sits from the flat fit (negative is closer). Tilting makes the same
 // zoom look much further out, so it goes closer; measured in a browser, not derived.
-const TILT_ZOOM_OUT = -0.8
+const TILT_ZOOM_OUT = -0.4
 const EMPTY = { type: 'FeatureCollection' as const, features: [] }
 function sameBox(a: Bbox, b: Bbox | null): boolean {
   return b !== null && a.every((v, i) => v === b[i])
@@ -288,6 +288,9 @@ export function StationMap({
   // Leaving the columns: they stay until the camera is flat again, see the button's handler.
   const [leaving, setLeaving] = useState(false)
   const leaveToken = useRef(0)
+  // The overlay owns a WebGL context. Browsers cap how many may be alive and drop the oldest, which
+  // can be the basemap's own, so the overlay is created once and kept (empty) instead of per toggle.
+  const [overlayUsed, setOverlayUsed] = useState(false)
   // Columns fade in once the camera has finished tilting, instead of showing up mid-move.
   const [grown, setGrown] = useState(false)
   // Column size follows the zoom, in steps small enough to look continuous.
@@ -545,7 +548,7 @@ export function StationMap({
               />
             </Source>
           ) : null}
-          {columns ? <ColumnOverlay layers={columnLayers} overlayRef={overlayRef} /> : null}
+          {overlayUsed ? <ColumnOverlay layers={columnLayers} overlayRef={overlayRef} /> : null}
           {columns ? null : (
             <Source id="stations" type="geojson" data={data}>
               <Layer
@@ -644,6 +647,7 @@ export function StationMap({
               leaveToken.current += 1
               setLeaving(false)
               setColumns(true)
+              setOverlayUsed(true)
               setGrown(false)
               leaveToken.current += 1
               const token = leaveToken.current

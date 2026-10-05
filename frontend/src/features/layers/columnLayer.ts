@@ -10,7 +10,7 @@ import {
 type Rgba = [number, number, number, number]
 type Station = MapStationCollection['features'][number]
 
-export const COLUMN_PITCH = 55
+export const COLUMN_PITCH = 45
 const STALE_ALPHA = 140
 const EMPTY_FILL: Rgba = [180, 192, 190, 255]
 const SELECTED_FILL: Rgba = [10, 117, 112, 170]
@@ -50,7 +50,7 @@ export function metresPerPixel({ zoom, latitude }: MapView): number {
 
 /** Columns are sized in screen pixels, so zooming in separates stations that overlapped before. */
 const COLUMN_RADIUS_PX = 6
-const COLUMN_MAX_HEIGHT_PX = 150
+const COLUMN_MAX_HEIGHT_PX = 110
 
 export interface MapView {
   zoom: number
