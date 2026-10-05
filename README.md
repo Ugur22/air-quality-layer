@@ -8,19 +8,19 @@ Data comes from [OpenAQ](https://openaq.org) (plus [Luchtmeetnet](https://www.lu
 
 ## What it does
 
-**Regions.** Search for a place or draw a rectangle on the map, then sync. A background worker pulls the stations OpenAQ has inside that box and the map shows them. A sync ends as `succeeded`, or as `failed` with a readable reason and no partial data.
+**Regions:** Search for a place or draw a rectangle on the map, then sync. A background worker pulls the stations OpenAQ has inside that box and the map shows them. A sync ends as `succeeded`, or as `failed` with a readable reason and no partial data.
 
-**Countries.** An hourly background job builds a layer for each of 44 European countries (Europe in OpenAQ's list, plus Turkey). Opening the country view fetches nothing upstream; it reads what the server already built.
+**Countries:** An hourly background job builds a layer for each of 44 European countries (Europe in OpenAQ's list, plus Turkey). Opening the country view fetches nothing upstream; it reads what the server already built.
 
 ![The Netherlands, 295 stations coloured by PM2.5](docs/screenshots/country-view.png)
 
-**Compare.** Add a second country (two at most) and both share one map, each with its own border colour. A table sets the chosen pollutant side by side: how many stations report it, plus the average, median, lowest and highest value.
+**Compare:** Add a second country (two at most) and both share one map, each with its own border colour. A table sets the chosen pollutant side by side: how many stations report it, plus the average, median, lowest and highest value.
 
 ![Two countries compared on one map: Netherlands and Germany, with a side-by-side table of PM2.5 figures](docs/screenshots/compare.png)
 
-**Filter.** Choose a pollutant, a comparison (greater than, at least, less than, equals) and a number, for example "PM2.5 greater than 15". The map and the station list narrow to the stations that match. With two countries chosen, the filter applies to both.
+**Filter:** Show only the stations above or below a value you pick. Choose a pollutant such as PM2.5, then a comparison such as "greater than", then a number such as 15. The map and the station list shrink to the stations that match, and when two countries are compared the filter applies to both.
 
-**Columns.** Switch the map to 3D columns. A column's height is the reading itself, so one twice as tall is twice the value, and its colour is the same guideline class as the badge. Stale readings fade instead of showing a hollow badge.
+**Columns:** Switch the map to 3D columns. A column's height is the reading itself, so one twice as tall is twice the value, and its colour is the same guideline class as the badge. Stale readings fade instead of showing a hollow badge.
 
 ### Reading the map
 
@@ -45,12 +45,12 @@ Without an `OPENAQ_API_KEY` the API starts, but syncs and refreshes cannot pull 
 
 ## Checks
 
-| Command | Runs |
-|---|---|
-| `make check` | Everything below |
-| `make backend-check` | ruff, mypy (strict), pytest against a real PostGIS test database (needs `make up`) |
-| `make frontend-check` | `tsc -b`, eslint, prettier, Vitest |
-| `make e2e` | Playwright against the running stack |
+| Command               | Runs                                                                               |
+| --------------------- | ---------------------------------------------------------------------------------- |
+| `make check`          | Everything below                                                                   |
+| `make backend-check`  | ruff, mypy (strict), pytest against a real PostGIS test database (needs `make up`) |
+| `make frontend-check` | `tsc -b`, eslint, prettier, Vitest                                                 |
+| `make e2e`            | Playwright against the running stack                                               |
 
 CI does not exist yet, so nothing runs these automatically. See [docs/quality.md](docs/quality.md).
 
@@ -70,14 +70,14 @@ Browser (React) ──HTTP──▶ API (FastAPI) ──▶ PostgreSQL / PostGIS
 
 ## Project docs
 
-| Doc | What is in it |
-|---|---|
-| [docs/product.md](docs/product.md) | What the product is for, and what it deliberately is not |
-| [docs/domain.md](docs/domain.md) | Entities and naming |
-| [docs/architecture.md](docs/architecture.md) | Stack choices, boundaries, open decisions |
-| [docs/api-contracts.md](docs/api-contracts.md) | Every endpoint, shape and error code |
-| [docs/decisions/](docs/decisions/README.md) | Architecture decision records |
-| [AGENTS.md](AGENTS.md) | How AI agents work in this repo; AirLayer is also a showcase of disciplined AI-assisted engineering |
+| Doc                                            | What is in it                                                                                       |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| [docs/product.md](docs/product.md)             | What the product is for, and what it deliberately is not                                            |
+| [docs/domain.md](docs/domain.md)               | Entities and naming                                                                                 |
+| [docs/architecture.md](docs/architecture.md)   | Stack choices, boundaries, open decisions                                                           |
+| [docs/api-contracts.md](docs/api-contracts.md) | Every endpoint, shape and error code                                                                |
+| [docs/decisions/](docs/decisions/README.md)    | Architecture decision records                                                                       |
+| [AGENTS.md](AGENTS.md)                         | How AI agents work in this repo; AirLayer is also a showcase of disciplined AI-assisted engineering |
 
 ## Status
 
