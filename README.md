@@ -14,13 +14,13 @@ Data comes from [OpenAQ](https://openaq.org) (plus [Luchtmeetnet](https://www.lu
 
 ![The Netherlands, 295 stations coloured by PM2.5](docs/screenshots/country-view.png)
 
-**Compare.** Choose a second country and both layers share one map, each with its own border colour. A table compares the chosen pollutant: how many stations report, plus average, median, lowest and highest.
+**Compare.** Add a second country (two at most) and both share one map, each with its own border colour. A table sets the chosen pollutant side by side: how many stations report it, plus the average, median, lowest and highest value.
 
 ![Two countries compared on one map: Netherlands and Germany, with a side-by-side table of PM2.5 figures](docs/screenshots/compare.png)
 
-**Filter.** Pick a pollutant and a condition ("PM2.5 greater than 15"). The server does the matching and the map and list narrow to the stations that pass.
+**Filter.** Choose a pollutant, a comparison (greater than, at least, less than, equals) and a number, for example "PM2.5 greater than 15". The map and the station list narrow to the stations that match. With two countries chosen, the filter applies to both.
 
-**Columns.** Switch the map to 3D columns, with height and colour following the reading.
+**Columns.** Switch the map to 3D columns. A column's height is the reading itself, so one twice as tall is twice the value, and its colour is the same guideline class as the badge. Stale readings fade instead of showing a hollow badge.
 
 ### Reading the map
 
